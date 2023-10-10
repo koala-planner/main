@@ -5,7 +5,6 @@ use std::{rc::Rc, collections::{HashSet, HashMap}, ops::Index};
 pub struct OutcomeDeterminizer {}
 
 impl OutcomeDeterminizer {
-    // TODO: FIX, all non-det action in decompositions must also be changed to the determinized compound task 
     pub fn htn(problem: &FONDProblem) -> FONDProblem {
         // We assume a collapsed network (i.e., with only one init abstract task)
         if problem.init_tn.count_tasks() > 1 {
