@@ -52,7 +52,7 @@ pub fn failure_test() {
         ])
     ).collapse_tn();
     let problem = FONDProblem {
-        facts: Facts::new(vec!["1".to_string()]),
+        facts: Facts::new(vec!["1".to_string(), "4".to_string()]),
         tasks: DomainTasks::from_rc_tasks(vec![p1, p2, p3, t1]),
         initial_state: HashSet::from([1, 4]),
         init_tn: init_tn

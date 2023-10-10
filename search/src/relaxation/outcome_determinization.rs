@@ -5,38 +5,88 @@ use std::{rc::Rc, collections::{HashSet, HashMap}, ops::Index};
 pub struct OutcomeDeterminizer {}
 
 impl OutcomeDeterminizer {
+    // TODO: FIX, all non-det action in decompositions must also be changed to the determinized compound task 
     pub fn htn(problem: &FONDProblem) -> FONDProblem {
         // We assume a collapsed network (i.e., with only one init abstract task)
         if problem.init_tn.count_tasks() > 1 {
             panic!("tn not in collapsed format")
         }
-        let tasks = &problem.tasks;
-        let mut new_tasks = vec![];
-        for task in tasks.get_all_tasks().iter() {
+        let all_tasks = problem.tasks.get_all_tasks();
+        // Identifying non-determinsitic actions in the domain
+        let mut nd_actions = HashMap::new();
+        for task in all_tasks.iter() {
             if task.is_primitive() {
                 if let Task::Primitive(action) = task.as_ref() {
-                    let new_task = Task::Compound(OutcomeDeterminizer::to_abstract(action));
-                    let new_task = Rc::new(new_task);
-                    new_tasks.push(new_task);
+                    if !action.is_deterministic() {
+                        let (c, det_actions) = OutcomeDeterminizer::to_abstract(action);
+                        let new_task = Task::Compound(c);
+                        let det_actions: Vec<Rc<Task>> = det_actions.into_iter()
+                            .map(|x| Rc::new(Task::Primitive(x)))
+                            .collect();
+                        nd_actions.insert(
+                            action.name.clone(),
+                            (Rc::new(new_task), det_actions)
+                        );
+                    }
                 }
-            } else {
-                new_tasks.push(task.clone());
             }
         }
+        // Substituing ND-Actions in the domain with their all outcome relaxed version.
+        let mut new_tasks = vec![];
+        for task in all_tasks.iter() {
+            match task.as_ref() {
+                Task::Compound(comp) => {
+                    let mut new_methods = vec![];
+                    for method in comp.methods.clone().iter_mut() {
+                        let subtask_names: Vec<(String, u32)> = method.decomposition.get_all_tasks_with_ids()
+                            .iter()
+                            .map(|(x, y)| {
+                                (x.get_name(), *y)
+                            }).collect();
+                        for (subtask, id) in subtask_names.iter(){
+                            if nd_actions.contains_key(subtask) {
+                                let (det_comp, _) = nd_actions.get(subtask).unwrap();
+                                method.decomposition.change_task(*id, det_comp.clone());
+                            }
+                        }
+                        new_methods.push(method.to_owned());
+                    }
+                    new_tasks.push(Rc::new(Task::Compound(CompoundTask {
+                        name: comp.name.clone(), methods: new_methods })));
+                },
+                Task::Primitive(prim) => {
+                    if prim.is_deterministic() {
+                        new_tasks.push(task.clone());
+                    } else {
+                        let (det_comp, det_prims) = nd_actions.get(&prim.name).unwrap();
+                        new_tasks.push(det_comp.clone());
+                        new_tasks.extend(det_prims.clone());
+                    }
+                }
+            }
+        }
+        // Modify the initial task (which is not included in the domain)
         let init_task = &problem.init_tn.get_all_tasks()[0];
         if let Task::Compound(x) = init_task.as_ref() {
             let init_decomposition = &x.methods[0].decomposition;
             let mut new_mappings = HashMap::new();
             for node in init_decomposition.get_nodes().iter() {
-                if init_decomposition.is_primitive(*node) {
-                    let substitution: Rc<Task> = new_tasks.iter().filter(|t| {
-                        let name = init_decomposition.get_task(*node).unwrap().get_name() + "__determinized";
-                        t.get_name() == name
-                    }).collect::<Vec<&Rc<Task>>>()[0]
-                    .clone();
-                    new_mappings.insert(*node, substitution);
-                } else {
-                    new_mappings.insert(*node, init_decomposition.get_task(*node).unwrap());
+                match init_decomposition.get_task(*node).unwrap().as_ref() {
+                    Task::Compound(comp) => {
+                        new_mappings.insert(*node, init_decomposition.get_task(*node).unwrap());
+                    },
+                    Task::Primitive(prim) => {
+                        if prim.is_deterministic() {
+                            new_mappings.insert(*node, init_decomposition.get_task(*node).unwrap());
+                        } else {
+                            let substitution: Rc<Task> = new_tasks.iter().filter(|t| {
+                                let name = init_decomposition.get_task(*node).unwrap().get_name() + "__determinized";
+                                t.get_name() == name
+                            }).collect::<Vec<&Rc<Task>>>()[0]
+                            .clone();
+                            new_mappings.insert(*node, substitution);
+                        }
+                    }
                 }
             }
             let new_init_decomposition = init_decomposition.change_mappings(new_mappings);
@@ -63,10 +113,10 @@ impl OutcomeDeterminizer {
 
     // Converts a primitive task to an abstract one with several
     // methods for each outcome
-    fn to_abstract(action: &PrimitiveAction) -> CompoundTask {
+    fn to_abstract(action: &PrimitiveAction) -> (CompoundTask, Vec<PrimitiveAction>) {
         let determinized_actions = action.determinize();
         let mut methods = vec![];
-        for (i, new_action) in determinized_actions.into_iter().enumerate() {
+        for (i, new_action) in determinized_actions.clone().into_iter().enumerate() {
             let new_method = Method::new(
                 new_action.name.clone() + "__method_" + &i.to_string(),
                 HTN::new(
@@ -79,7 +129,12 @@ impl OutcomeDeterminizer {
             );
             methods.push(new_method);
         }
-        CompoundTask { name: action.name.clone() + "__determinized", methods: methods }
+        let c = CompoundTask { name: action.name.clone() + "__determinized", methods: methods };
+        (c, determinized_actions)
+    }
+
+    fn method_subsititution() {
+        
     }
 }
 
@@ -126,7 +181,7 @@ mod tests {
             HashSet::from([1,2,3]),
             vec![(1,3), (2,3)],
             HashMap::from(
-                [(1, Rc::clone(&p1)), (2, Rc::clone(&t1)), (3, Rc::clone(&p3))]
+                [(1, Rc::clone(&p1)), (2, Rc::clone(&t1)), (3, Rc::clone(&p2))]
             )
         ).collapse_tn();
         let state = HashSet::from([1]);
@@ -141,7 +196,7 @@ mod tests {
         let relaxed = OutcomeDeterminizer::htn(&problem);
         assert_eq!(relaxed.facts.count(), problem.facts.count());
         let new_tasks = relaxed.tasks.get_all_tasks();
-        assert_eq!(new_tasks.len(), 4);
+        assert_eq!(new_tasks.len(), 6);
         for task in new_tasks.iter() {
             if task.get_name() == "p2__determinized" {
                 if let Task::Compound(CompoundTask { name, methods }) = task.as_ref() {
@@ -158,8 +213,8 @@ mod tests {
             let decomp = &t.methods[0].decomposition;
             assert_eq!(decomp.count_tasks(), 3);
             let task_names: Vec<String> = decomp.get_all_tasks().iter().map(|x| x.get_name()).collect();
-            assert_eq!(task_names.contains(&"p1__determinized".to_string()), true);
-            assert_eq!(task_names.contains(&"p3__determinized".to_string()), true);
+            assert_eq!(task_names.contains(&"p1".to_string()), true);
+            assert_eq!(task_names.contains(&"p2__determinized".to_string()), true);
             assert_eq!(task_names.contains(&"t1".to_string()), true)
         }
         assert_eq!(relaxed.init_tn.count_tasks(), problem.init_tn.count_tasks());

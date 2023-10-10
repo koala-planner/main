@@ -1,8 +1,7 @@
 use std::{collections::HashSet, rc::Rc, cell::RefCell};
-use crate::{task_network::Applicability, relaxation::ToClassical, heuristic_calculator::AStar};
+use crate::{task_network::Applicability, relaxation::ToClassical};
 
 use super::{HTN, PrimitiveAction, Task, CompoundTask};
-use crate::heuristic_calculator::AStarResult;
 #[derive(Debug)]
 pub struct SearchNode{
     pub state: Rc<HashSet<u32>>,
@@ -15,12 +14,9 @@ impl SearchNode {
     }
     
     pub fn compute_heuristic_value(&self, encoder: &ToClassical) -> f32 {
-        let encoded = encoder.encode(&self.tn, &self.state);
-        let heuristic_val = AStar::solve(&encoded);
-        match heuristic_val {
-            AStarResult::Success(x) => x,
-            AStarResult::NoSolution => f32::INFINITY
-        }
+        let relaxed_state = encoder.compute_relaxed_state(&self.tn, self.state.as_ref());
+        // TODO: implement heuristic calc for this state
+        todo!()
     }
 
     pub fn is_goal(&self) -> bool {

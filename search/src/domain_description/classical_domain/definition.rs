@@ -8,18 +8,14 @@ use super::Facts;
 pub struct ClassicalDomain {
     pub facts: Facts,
     pub actions: Vec<PrimitiveAction>,
-    pub init_state: HashSet<u32>,
-    pub goal_state: HashSet<u32>
 }
 
 impl ClassicalDomain {
     pub fn new(
         facts: Facts,
         actions: Vec<PrimitiveAction>,
-        init_state: HashSet<u32>,
-        goal_state: HashSet<u32>
     ) -> ClassicalDomain {
-        ClassicalDomain { facts, actions, init_state, goal_state }
+        ClassicalDomain { facts, actions}
     }
 
     pub fn delete_relax(&self) -> ClassicalDomain {
@@ -29,9 +25,7 @@ impl ClassicalDomain {
             }).collect();
         ClassicalDomain::new(
             self.facts.clone(),
-            new_actions, 
-            self.init_state.clone(), 
-            self.goal_state.clone()
+            new_actions,
         )
     }
 }

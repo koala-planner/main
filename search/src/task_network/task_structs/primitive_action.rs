@@ -6,9 +6,9 @@ use crate::task_network::applicability::Applicability;
 pub struct PrimitiveAction{
     pub name: String,
     pub cost: u32,
-    pre_cond: HashSet<u32>,
-    add_effects: Vec<HashSet<u32>>,
-    del_effects: Vec<HashSet<u32>>,
+    pub pre_cond: HashSet<u32>,
+    pub add_effects: Vec<HashSet<u32>>,
+    pub del_effects: Vec<HashSet<u32>>,
 }
 
 impl PrimitiveAction {
@@ -29,7 +29,7 @@ impl PrimitiveAction {
     }
 
     pub fn is_deterministic(&self) -> bool {
-        self.add_effects.len() == 1
+        self.add_effects.len() < 2
     }
 
     pub fn augment(

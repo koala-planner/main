@@ -31,6 +31,12 @@ impl HTN {
         }).collect()
     }
 
+    pub fn get_all_tasks_with_ids(&self) -> Vec<(Rc<Task>, u32)> {
+        self.network.nodes.iter().map(|id| {
+            (self.get_task(*id).unwrap(), *id)
+        }).collect()
+    }
+
     pub fn count_tasks(&self) -> usize {
         self.network.count_nodes()
     }
@@ -200,6 +206,11 @@ impl HTN {
 
     pub fn change_mappings(&self, new_mappings: HashMap<u32, Rc<Task>>) -> HTN {
         HTN { network: self.network.clone(), mappings: new_mappings }
+    }
+
+    pub fn change_task(&mut self, id: u32, new_task: Rc<Task>) {
+        self.mappings.remove(&id);
+        self.mappings.insert(id, new_task);
     }
     
 }

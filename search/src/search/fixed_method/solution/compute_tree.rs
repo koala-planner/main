@@ -1,4 +1,5 @@
-use crate::relaxation::{DeleteRelaxation, OutcomeDeterminizer, ToClassical};
+use crate::domain_description::ClassicalDomain;
+use crate::relaxation::{DeleteRelaxation, OutcomeDeterminizer};
 use core::panic;
 use std::collections::{HashMap, HashSet, LinkedList};
 
@@ -6,6 +7,7 @@ use super::fm_policy::FMPolicy;
 use super::ConnectionLabel;
 use super::{connectors::NodeConnections, ComputeTreeNode, FONDProblem, SearchNode, SearchResult};
 use super::{Connector, HyperArc, NodeStatus, HTN};
+use crate::relaxation::ToClassical;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -30,9 +32,8 @@ impl ComputeTree {
             cost: 0.0,
             label: NodeStatus::OnGoing,
         };
-        let mut relaxed = DeleteRelaxation::htn(&problem);
-        relaxed = OutcomeDeterminizer::htn(&problem);
-        let relaxed = ToClassical::new(relaxed);
+        let outcome_det = OutcomeDeterminizer::htn(problem);
+        let relaxed = ToClassical::new(&outcome_det);
         ComputeTree {
             ids: HashMap::from([(1, RefCell::new(compute_node))]),
             root: 1,
