@@ -28,4 +28,10 @@ impl ClassicalDomain {
             new_actions,
         )
     }
+
+    pub fn get_actions_by_index(&self, indices: HashSet<usize>) -> Vec<&PrimitiveAction> {
+        self.actions.iter().enumerate().filter(|(i, action)| {
+            indices.contains(i)
+        }).map(|(i, action)| action).collect()
+    }
 }

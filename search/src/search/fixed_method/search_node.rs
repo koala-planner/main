@@ -15,6 +15,8 @@ impl SearchNode {
     
     pub fn compute_heuristic_value(&self, encoder: &ToClassical) -> f32 {
         let relaxed_state = encoder.compute_relaxed_state(&self.tn, self.state.as_ref());
+        let goal_state = encoder.compute_goal_state(&self.tn);
+        
         // TODO: implement FF
         todo!()
     }

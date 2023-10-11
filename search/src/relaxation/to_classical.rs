@@ -105,6 +105,13 @@ impl ToClassical {
         satisfied_preconds.extend(state);
         satisfied_preconds     
     }
+
+    // TODO: test
+    pub fn compute_goal_state(&self, tn: &HTN) -> HashSet<u32> {
+        tn.get_all_tasks().iter().map(|x| {
+            self.domain.facts.get_id(&x.get_name())
+        }).collect()
+    } 
 }
 
 #[cfg(test)]

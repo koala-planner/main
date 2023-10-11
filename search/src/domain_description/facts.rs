@@ -46,6 +46,10 @@ impl Facts {
     pub fn contains(&self, literal: &String) -> bool {
         self.literals.contains(literal)
     }
+
+    pub fn get_all_ids(&self) -> Vec<u32> {
+        self.ids.iter().map(|(_,v) | v).cloned().collect()
+    }
 }
 
 #[cfg(test)]

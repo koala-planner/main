@@ -32,7 +32,7 @@ impl ComputeTree {
             cost: 0.0,
             label: NodeStatus::OnGoing,
         };
-        let outcome_det = OutcomeDeterminizer::htn(problem);
+        let outcome_det = OutcomeDeterminizer::htn(&problem);
         let relaxed = ToClassical::new(&outcome_det);
         ComputeTree {
             ids: HashMap::from([(1, RefCell::new(compute_node))]),
