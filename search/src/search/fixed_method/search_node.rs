@@ -1,5 +1,5 @@
 use std::{collections::HashSet, rc::Rc, cell::RefCell};
-use crate::{task_network::Applicability, relaxation::ToClassical};
+use crate::{task_network::Applicability, relaxation::ToClassical, heuristic_calculator::FF};
 
 use super::{HTN, PrimitiveAction, Task, CompoundTask};
 #[derive(Debug)]
@@ -16,9 +16,7 @@ impl SearchNode {
     pub fn compute_heuristic_value(&self, encoder: &ToClassical) -> f32 {
         let relaxed_state = encoder.compute_relaxed_state(&self.tn, self.state.as_ref());
         let goal_state = encoder.compute_goal_state(&self.tn);
-        
-        // TODO: implement FF
-        todo!()
+        FF::calculate_h(&encoder.domain, &relaxed_state, &goal_state)
     }
 
     pub fn is_goal(&self) -> bool {

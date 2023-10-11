@@ -11,6 +11,8 @@ use crate::relaxation::ToClassical;
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use crate::heuristic_calculator::FF;
+
 #[derive(Debug)]
 pub struct ComputeTree {
     pub ids: HashMap<u32, RefCell<ComputeTreeNode>>,

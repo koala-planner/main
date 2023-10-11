@@ -4,24 +4,19 @@ use crate::domain_description::ClassicalDomain;
 
 use super::GraphPlan;
 
-pub struct FF {
-    domain: ClassicalDomain
-}
+#[derive(Debug)]
+pub struct FF {}
 
 impl FF {
-    pub fn new(domain: ClassicalDomain) -> FF {
-        FF { domain }
-    }
-
-    pub fn calculate_h(&self, state: &HashSet<u32>, goal: &HashSet<u32>) -> f32 {
+    pub fn calculate_h(domain: &ClassicalDomain, state: &HashSet<u32>, goal: &HashSet<u32>) -> f32 {
         let graphplan = GraphPlan::build_graph(
-            &self.domain,
+            domain,
             state,
             goal
         );
         match graphplan {
             Some(graph) => {
-                return self.plan_length(graph, goal) as f32
+                return FF::plan_length(domain, graph, goal) as f32
             },
             None => {
                 return f32::INFINITY;
@@ -29,7 +24,7 @@ impl FF {
         }
     }
 
-    fn plan_length(&self, graphplan: GraphPlan, goal_state: &HashSet<u32>) -> u32 {
+    fn plan_length(domain: &ClassicalDomain, graphplan: GraphPlan, goal_state: &HashSet<u32>) -> u32 {
         let mut len = 0;
         let mut G = graphplan.compute_goal_indices(goal_state);
         let mut marks = HashMap::new();
@@ -43,7 +38,7 @@ impl FF {
             let open_goals: HashSet<u32> = G.get(&i).unwrap().difference(marks.get(&i).unwrap()).cloned().collect();
             for open_goal in open_goals.iter() {
                 let actions = graphplan.get_action_layer(i-1);
-                let mut actions = self.domain.get_actions_by_index(actions);
+                let mut actions = domain.get_actions_by_index(actions);
                 // select only actions that produce this goal
                 actions = actions.iter().filter(|x|{
                     if x.add_effects.len() > 1 {
@@ -136,8 +131,7 @@ mod test {
     #[test]
     pub fn h_val_test() {
         let domain = generate_domain();
-        let ff = FF::new(domain);
-        let h = ff.calculate_h(&HashSet::from([0]), &HashSet::from([4]));
+        let h = FF::calculate_h(&domain, &HashSet::from([0]), &HashSet::from([4]));
         assert_eq!(h, 4.0);
     }
 }

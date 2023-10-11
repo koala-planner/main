@@ -1,4 +1,5 @@
 mod graphplan;
 mod fast_forward;
 
-pub use graphplan::GraphPlan;
+pub use fast_forward::FF;
+use graphplan::GraphPlan;
