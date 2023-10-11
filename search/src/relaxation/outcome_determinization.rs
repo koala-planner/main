@@ -89,6 +89,7 @@ impl OutcomeDeterminizer {
                 }
             }
             let new_init_decomposition = init_decomposition.change_mappings(new_mappings);
+            let tasks = new_init_decomposition.get_all_tasks();
             let new_top = Rc::new(Task::Compound(CompoundTask {
                 name: "__P_G_T_".to_string(),
                 methods: vec![

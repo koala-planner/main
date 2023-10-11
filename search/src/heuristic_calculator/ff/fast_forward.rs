@@ -31,7 +31,7 @@ impl FF {
         for i in 0..graphplan.depth + 1 {
             marks.insert(i, HashSet::new());
         }
-        for i in (0..graphplan.depth + 1).rev() {
+        for i in (1..graphplan.depth + 1).rev() {
             if G.get(&i).is_none() {
                 continue;
             }

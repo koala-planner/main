@@ -9,3 +9,4 @@ edition = "2021"
 serde = { version = "*", features = ["derive"] }
 serde_json = "*"
 rand = "*"
+regex = "1.10.0"

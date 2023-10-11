@@ -5,6 +5,7 @@ use super::TDG;
 use crate::domain_description::{ClassicalDomain, Facts};
 use crate::task_network::{PrimitiveAction, Task};
 use crate::{domain_description::FONDProblem, task_network::HTN};
+use regex::Regex;
 
 #[derive(Debug)]
 pub struct ToClassical {
@@ -59,9 +60,17 @@ impl ToClassical {
                     if p.add_effects.len() > 1 {
                         panic!("Relaxation assumes an all outcome determinized FOND problem");
                     }
+                    // action executed effect
                     let mut add_effects = HashSet::from([facts.get_id(&p.name)]);
+                    // canonical effects
                     if p.add_effects.len() == 1 {
                         add_effects.extend(p.add_effects[0].clone());
+                    }
+                    if p.name.contains("__determinized_") {
+                        let re = Regex::new(r"__determinized_[0-9]+").unwrap();
+                        let cleansed_name = re.replace(&p.name, "__determinized").to_string();
+                        let fact_id = facts.get_id(&cleansed_name);
+                        add_effects.insert(fact_id);
                     }
                     let top_down_precond = facts.get_id(&(p.name.clone() + "_reachable"));
                     let mut preconds = HashSet::from([top_down_precond]);
@@ -108,9 +117,18 @@ impl ToClassical {
 
     // TODO: test
     pub fn compute_goal_state(&self, tn: &HTN) -> HashSet<u32> {
-        tn.get_all_tasks().iter().map(|x| {
-            self.domain.facts.get_id(&x.get_name())
-        }).collect()
+        let mut goal = HashSet::new();
+        for task in tn.get_all_tasks().iter() {
+            let mut name = task.get_name();
+            if let Task::Primitive(p) = task.as_ref() {
+                if !p.is_deterministic() {
+                    name += "__determinized";
+                }
+            }
+            let g = self.domain.facts.get_id(&name);
+            goal.insert(g);
+        }
+        goal
     } 
 }
 
