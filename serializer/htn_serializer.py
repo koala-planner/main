@@ -1,9 +1,9 @@
 import re
 class HTNSerializer:
-    # open raw *.htn file
+    # open raw *.ground file
     def __init__(self, path):
         s = ""
-        with open("result.ground", "r") as f:
+        with open(path, "r") as f:
             s = f.read()
         self.raw_str = s
         self.serialized = {}
@@ -34,7 +34,7 @@ class HTNSerializer:
             action["add_eff"] = self.process_effects(raw_actions[i+2])
             action["del_eff"] = self.process_effects(raw_actions[i+3])
             processed_actions[self.serialized["tasks"]["primitive"][i//4]] = action
-        self.serialized["actions"]= processed_actions
+        self.serialized["actions"] = processed_actions
     # TODO: Complete this 
     # TODO: investigate what _splitting_method is in the output
     # Process methods
