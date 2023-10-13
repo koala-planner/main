@@ -55,6 +55,7 @@ minimize			{return KEY_MIMIZE;}
 
 and				{return KEY_AND;}
 or				{return KEY_OR;}
+oneof			{return KEY_XOR;}
 not				{return KEY_NOT;}
 imply			{return KEY_IMPLY;}
 forall			{return KEY_FORALL;}
