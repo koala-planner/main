@@ -89,7 +89,6 @@ impl ToClassical {
         result
     }
 
-    // TODO: Test
     pub fn compute_relaxed_state(&self, tn: &HTN, state: &HashSet<u32>) -> HashSet<u32> {
         let reachables = self.tdg.reachable_from_tn(tn);
         let mut satisfied_preconds = HashSet::new();
@@ -285,6 +284,28 @@ mod tests {
             }
             assert_eq!(is_contained, true);
         }
+    }
 
+    #[test]
+    pub fn goal_state_test() {
+        let problem = generate_problem();
+        let to_classical = ToClassical::new(&problem);
+        let all_tasks = problem.tasks.get_all_tasks();
+        let t1 = &all_tasks.iter()
+            .filter(|x| x.get_name() == "t1").cloned().collect::<Vec<Rc<Task>>>()[0];
+        let p2 = &all_tasks.iter()
+            .filter(|x| x.get_name() == "P2").cloned().collect::<Vec<Rc<Task>>>()[0];
+        let state = HashSet::from([to_classical.domain.facts.get_id("1")]);
+        let tn = HTN::new(
+            HashSet::from([1, 2]),
+            vec![],
+            HashMap::from([(1, t1.clone()), (2, p2.clone())])
+        );
+        let goal = to_classical.compute_goal_state(&tn);
+        assert_eq!(goal.len(), 2);
+        let id_t1 = to_classical.domain.facts.get_id("t1");
+        let id_p2 = to_classical.domain.facts.get_id("P2");
+        assert_eq!(goal.contains(&id_t1), true);
+        assert_eq!(goal.contains(&id_p2), true);
     }
 }
