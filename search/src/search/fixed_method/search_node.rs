@@ -23,7 +23,6 @@ impl SearchNode {
         self.tn.is_empty()
     }
 
-    // TODO: test
     pub fn expand(&self) -> Vec<NodeExpansion> {
         if self.is_goal() {
             return vec![];
@@ -41,7 +40,6 @@ impl SearchNode {
         expansions
     }
 
-    // TODO: test
     fn expand_primitives(
         &self,
         primitive_tasks: HashSet<u32>
@@ -84,7 +82,6 @@ impl SearchNode {
         expansion
     } 
 
-    // TODO: test
     fn expand_abstract_task(&self, task_id: u32) -> Vec<NodeExpansion> {
         if let Task::Compound(t) = self.tn.get_task(task_id).unwrap().as_ref() {
             let mut expansions = vec![];
