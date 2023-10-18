@@ -114,7 +114,6 @@ impl ToClassical {
         satisfied_preconds     
     }
 
-    // TODO: test
     pub fn compute_goal_state(&self, tn: &HTN) -> HashSet<u32> {
         let mut goal = HashSet::new();
         for task in tn.get_all_tasks().iter() {
