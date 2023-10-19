@@ -1,6 +1,7 @@
 use super::Graph;
 use super::task_structs::{CompoundTask, Method, PrimitiveAction, Task};
 use std::collections::{HashMap, HashSet};
+use std::fmt::{self, write};
 use rand::distributions::DistString;
 use std::hash::Hash;
 use std::rc::Rc;
@@ -213,6 +214,20 @@ impl HTN {
         self.mappings.insert(id, new_task);
     }
     
+}
+
+impl fmt::Display for HTN {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        let layers = self.network.to_layers();
+        let layers = self.layers_to_tasks(layers);
+        for (i, layer) in layers.iter().enumerate() {
+            write!(f, "layer {}:\n", i);
+            for task in layer.iter() {
+                write!(f, "\t{}\n", task);
+            }
+        }
+        Ok(())
+     }
 }
 
 #[cfg(test)]

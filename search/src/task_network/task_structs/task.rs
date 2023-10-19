@@ -58,7 +58,14 @@ impl Task {
 
 impl fmt::Display for Task {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        writeln!(f, "{}", self.get_name())
+        match self {
+            Task::Compound(x) => {
+                writeln!(f, "(C) {}", x.name)
+            },
+            Task::Primitive(x) => {
+                writeln!(f, "(P) {}", x.name)
+            }
+        }
     }
 }
 
