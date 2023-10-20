@@ -1,6 +1,5 @@
 use crate::domain_description::ClassicalDomain;
 use crate::relaxation::{DeleteRelaxation, OutcomeDeterminizer};
-use core::panic;
 use std::collections::{HashMap, HashSet, LinkedList};
 
 use super::fm_policy::FMPolicy;
@@ -19,7 +18,7 @@ pub struct ComputeTree {
     pub root: u32,
     // Keeps teack of maximum u32 ID used in the tree
     cursor: u32,
-    relaxed_domain: ToClassical,
+    // relaxed_domain: ToClassical,
 }
 
 impl ComputeTree {
@@ -34,13 +33,13 @@ impl ComputeTree {
             cost: 0.0,
             label: NodeStatus::OnGoing,
         };
-        let outcome_det = OutcomeDeterminizer::htn(&problem);
-        let relaxed = ToClassical::new(&outcome_det);
+        // let outcome_det = OutcomeDeterminizer::htn(&problem);
+        // let relaxed = ToClassical::new(&outcome_det);
         ComputeTree {
             ids: HashMap::from([(1, RefCell::new(compute_node))]),
             root: 1,
             cursor: 2,
-            relaxed_domain: relaxed,
+            // relaxed_domain: relaxed,
         }
     }
 
@@ -62,7 +61,6 @@ impl ComputeTree {
         }
     }
 
-    // TODO: test this function
     pub fn get_tip_nodes(&self) -> HashSet<u32> {
         let mut working_set = HashSet::from([self.root]);
         let mut tip_node_ids: HashSet<u32> = HashSet::new();
@@ -71,6 +69,7 @@ impl ComputeTree {
             // Follow Markers
             for x in working_set.iter() {
                 let node = self.ids.get(x).unwrap().borrow();
+                let mut marker_update = None;
                 match &node.connections {
                     Some(connection) => {
                         let node_status = self.compute_node_status(*x);
@@ -82,7 +81,9 @@ impl ComputeTree {
                                 marked.extend(children.children.iter());
                             }
                             None => {
-                                panic!()
+                                let (_, i) = self.compute_min_cost(connection);
+                                marked.extend(connection.children[i as usize].children.iter());
+                                marker_update = Some(i);
                             }
                         }
                     }
@@ -92,6 +93,10 @@ impl ComputeTree {
                         }
                         _ => {}
                     },
+                }
+                if marker_update.is_some() {
+                    let mut node = self.ids.get(x).unwrap().borrow_mut();
+                    node.mark(marker_update.unwrap());
                 }
             }
             if marked.is_empty() {
@@ -120,6 +125,7 @@ impl ComputeTree {
             self.mark_as_terminal(id);
             return;
         }
+        println!("WARNING, heuristics disabled");
         // Process node expansion to the desired format
         let expansions: Vec<(Vec<ComputeTreeNode>, ConnectionLabel)> = node_successors
             .into_iter()
@@ -128,7 +134,7 @@ impl ComputeTree {
                     x.items
                         .into_iter()
                         .map(|y| {
-                            let h = y.compute_heuristic_value(&self.relaxed_domain);
+                            let h = 0.0; //y.compute_heuristic_value(&self.relaxed_domain);
                             let child_label = NodeStatus::OnGoing;
                             ComputeTreeNode {
                                 parent_id: Some(id),
@@ -172,18 +178,17 @@ impl ComputeTree {
     }
 
     // return parent ID if further revision is needed
-    // TODO: test
     fn revise_node_cost(&mut self, id: &u32) -> Option<u32> {
         let mut node = self.ids.get(id).unwrap().borrow_mut();
         // Check whether Node is terminal or not
         match node.label {
             NodeStatus::Failed => {
                 node.cost = f32::INFINITY;
-                // TODO: update node cost
                 match node.parent_id {
                     Some(p_id) => {
                         let mut parent = self.ids.get(&p_id).unwrap().borrow_mut();
                         parent.clear_marks();
+                        parent.cost = f32::INFINITY;
                         return Some(p_id);
                     }
                     None => {
@@ -224,38 +229,20 @@ impl ComputeTree {
         }
     }
 
-    // TODO: Test
     fn children_status(&self, connections: &NodeConnections) -> NodeStatus {
         // Is there at least one path to continue?
-        let mut active = false;
+        let mut all_failed = true;
         for arc in connections.children.iter() {
-            let mut branch_status = NodeStatus::Solved;
-            for child in arc.children.iter() {
-                let child = self.ids.get(child).unwrap().borrow();
-                if child.cost.is_infinite() {
-                    branch_status = NodeStatus::Failed;
-                    break;
-                }
-                match child.label {
-                    NodeStatus::Failed => {
-                        branch_status = NodeStatus::Failed;
-                        break;
-                    }
-                    // Branch is solved
-                    NodeStatus::Solved => {
-                        return NodeStatus::Solved;
-                    }
-                    NodeStatus::OnGoing => {
-                        branch_status = NodeStatus::OnGoing;
-                        active = true;
-                    }
-                }
+            match self.arc_status(arc) {
+                NodeStatus::Solved => return NodeStatus::Solved,
+                NodeStatus::Failed => {},
+                NodeStatus::OnGoing => all_failed = false
             }
         }
-        if active {
-            NodeStatus::OnGoing
-        } else {
+        if all_failed {
             NodeStatus::Failed
+        } else {
+            NodeStatus::OnGoing
         }
     }
 
@@ -297,30 +284,7 @@ impl ComputeTree {
         let node = self.ids.get(&id).unwrap().borrow();
         match &node.connections {
             Some(connection) => {
-                let mut is_solved = true;
-                let mut has_failed = true;
-                for arc in connection.children.iter() {
-                    let status = self.arc_status(&arc);
-                    match status {
-                        NodeStatus::OnGoing => {
-                            is_solved = false;
-                            has_failed = false;
-                        }
-                        NodeStatus::Failed => {
-                            is_solved = false;
-                        }
-                        NodeStatus::Solved => {
-                            has_failed = false;
-                        }
-                    }
-                }
-                if is_solved {
-                    return NodeStatus::Solved;
-                }
-                if has_failed {
-                    return NodeStatus::Failed;
-                }
-                NodeStatus::OnGoing
+                return self.children_status(connection) 
             }
             None => return node.label.clone(),
         }
@@ -337,5 +301,208 @@ impl ComputeTree {
             }
         }
         result
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::task_network::{Task, PrimitiveAction};
+
+    use super::*;
+    fn generate_tree() -> ComputeTree {
+        let dummy_search_node = SearchNode {
+            state: Rc::new(HashSet::new()),
+            tn: Rc::new(HTN::new(
+                HashSet::new(), vec![], HashMap::new()
+            ))
+        };
+        let dummy_action = Rc::new(Task::Primitive(PrimitiveAction::new(
+            "p1".to_string(), 
+            1, 
+            HashSet::new(),
+            vec![HashSet::new(), HashSet::from([1,2])], 
+            vec![HashSet::new(), HashSet::from([3])]
+        )));
+        let n1 = ComputeTreeNode {
+            parent_id: None,
+            search_node: dummy_search_node.clone(),
+            connections: Some(NodeConnections { children: vec![
+                HyperArc { children: HashSet::from([2]), cost: 1.0, is_marked: false, action_type: ConnectionLabel::Execution(1)},
+                HyperArc { children: HashSet::from([3, 4]), cost: 1.0, is_marked: true, action_type: ConnectionLabel::Execution(2)},
+                HyperArc { children: HashSet::from([5]), cost: 0.0, is_marked: false, action_type: ConnectionLabel::Decomposition},
+            ]}),
+            cost: 2.0,
+            label: NodeStatus::OnGoing
+        };
+        let n2 = ComputeTreeNode {
+            parent_id: Some(1),
+            search_node: dummy_search_node.clone(),
+            connections: None,
+            cost: f32::INFINITY,
+            label: NodeStatus::Failed
+        };
+        let n3 = ComputeTreeNode {
+            parent_id: Some(1),
+            search_node: dummy_search_node.clone(),
+            connections: Some(NodeConnections { children: vec![
+                HyperArc { children: HashSet::from([6]), cost: 1.0, is_marked: true, action_type: ConnectionLabel::Decomposition}
+            ]}),
+            cost: 2.0,
+            label: NodeStatus::OnGoing
+        };
+        let n4 = ComputeTreeNode {
+            parent_id: Some(1),
+            search_node: dummy_search_node.clone(),
+            connections: None,
+            cost: 0.0,
+            label: NodeStatus::Solved
+        };
+        let n5 = ComputeTreeNode {
+            parent_id: Some(1),
+            search_node: dummy_search_node.clone(),
+            connections: Some(NodeConnections { children: vec![
+                HyperArc { children: HashSet::from([7, 8]), cost: 1.0, is_marked: false, action_type: ConnectionLabel::Execution(3)},
+            ]}),
+            cost: 3.0,
+            label: NodeStatus::OnGoing
+        };
+        let n6 = ComputeTreeNode {
+            parent_id: Some(3),
+            search_node: SearchNode::new(
+                Rc::new(HashSet::new()),
+                Rc::new(HTN::new(
+                    HashSet::from([1]), 
+                    vec![],
+                    HashMap::from([
+                        (1, dummy_action.clone())
+                    ])
+                ))
+            ),
+            connections: None,
+            cost: 1.0,  
+            label: NodeStatus::OnGoing
+        };
+        let n7 = ComputeTreeNode {
+            parent_id: Some(5),
+            search_node: dummy_search_node.clone(),
+            connections: None,
+            cost: 2.0,
+            label: NodeStatus::OnGoing
+        };
+        let n8 = ComputeTreeNode {
+            parent_id: Some(5),
+            search_node: dummy_search_node.clone(),
+            connections: None,
+            cost: 1.0,
+            label: NodeStatus::OnGoing
+        };
+        ComputeTree {
+            ids: HashMap::from([
+                (1, RefCell::new(n1)), (2, RefCell::new(n2)), (3, RefCell::new(n3)), (4, RefCell::new(n4)),
+                (5, RefCell::new(n5)), (6, RefCell::new(n6)), (7, RefCell::new(n7)), (8, RefCell::new(n8))
+            ]),
+            root: 1,
+            cursor: 9,
+        }
+    }
+
+    #[test]
+    pub fn tip_nodes_test() {
+        let tree = generate_tree();
+        tree.ids.get(&4).unwrap().borrow_mut().label = NodeStatus::OnGoing;
+        let tip_nodes = tree.get_tip_nodes();
+        assert_eq!(tip_nodes.len(), 2);
+        assert_eq!(tip_nodes.contains(&4), true);
+        assert_eq!(tip_nodes.contains(&6), true);
+    }
+
+    #[test]
+    pub fn expansion_test() {
+        let mut tree = generate_tree();
+        tree.expand(6);
+        assert_eq!(tree.ids.contains_key(&9), true);
+        assert_eq!(tree.ids.contains_key(&10), true);
+        assert_eq!(tree.ids.len(), 10);
+        let n = tree.ids.get(&6).unwrap().borrow();
+        match &n.connections {
+            Some(x) => {
+                assert_eq!(x.children.len(), 1);
+                let children = &x.children[0].children;
+                assert_eq!(children.contains(&9), true);
+                assert_eq!(children.contains(&10), true);
+            },
+            None => {panic!("children not found")},
+        }
+        let n_child1 = tree.ids.get(&9).unwrap().borrow();
+        match n_child1.parent_id {
+            Some(x) => assert_eq!(x, 6),
+            None => panic!("parent not found")
+        }
+        let n_child2 = tree.ids.get(&10).unwrap().borrow();
+        match n_child2.parent_id {
+            Some(x) => assert_eq!(x, 6),
+            None => panic!("parent not found")
+        }
+    }
+
+    #[test]
+    pub fn node_failure_revise_test() {
+        let mut tree = generate_tree();
+        let action = Task::Primitive(PrimitiveAction {
+            name: "p".to_string(),
+            cost: 1, pre_cond: HashSet::from([1,2]), add_effects: vec![], del_effects: vec![]
+        });
+        {
+            let mut node = tree.ids.get(&6).unwrap().borrow_mut();
+            node.search_node = SearchNode {
+                state: Rc::new(HashSet::new()),
+                tn: Rc::new(HTN::new(
+                    HashSet::from([1]), 
+                    vec![],
+                    HashMap::from([(1, Rc::new(action))])
+                ))
+            }
+        }
+        tree.expand(6);
+        assert_eq!(tree.ids.len(), 8);
+        tree.backward_cost_revision(6);
+        let failed_node = tree.ids.get(&6).unwrap().borrow();
+        match failed_node.label {
+            NodeStatus::Failed => {},
+            _ => {panic!("node label is incorrect")}
+        }
+        assert_eq!(failed_node.cost, f32::INFINITY);
+        let parent_node = tree.ids.get(&3).unwrap().borrow();
+        match parent_node.label {
+            NodeStatus::Failed => {},
+            _ => {panic!("node label is incorrect")}
+        }
+        assert_eq!(parent_node.get_marked_connection().is_none(), true);
+        assert_eq!(parent_node.cost, f32::INFINITY);
+        let root = tree.ids.get(&1).unwrap().borrow();
+        match root.label {
+            NodeStatus::OnGoing => {},
+            _ => {panic!("root label is incorrect")}
+        }
+        match root.get_marked_connection() {
+            Some(x) => {
+                assert_eq!(x.children.len(), 1);
+                assert_eq!(x.children.contains(&5), true)
+            },
+            None => panic!("nodes are not marked")
+        }
+        let new_tip_nodes = tree.get_tip_nodes();
+        assert_eq!(new_tip_nodes.len(), 2);
+        assert_eq!(new_tip_nodes.contains(&7), true);
+        assert_eq!(new_tip_nodes.contains(&8), true);
+        let node = tree.ids.get(&5).unwrap().borrow();
+        match node.connections.as_ref().unwrap().has_marked_connection() {
+            Some(x)=> {
+                assert_eq!(x.children.len(), 2);
+                assert_eq!(x.children.contains(&7), true);
+                assert_eq!(x.children.contains(&8), true);
+            },
+            None => panic!("wrong markers")
+        }
     }
 }
