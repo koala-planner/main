@@ -1,4 +1,5 @@
 import re
+from pprint import pprint
 class HTNSerializer:
     # open raw *.ground file
     def __init__(self, path):
@@ -33,7 +34,7 @@ class HTNSerializer:
             action["precond"] = precond_names
             action["add_eff"] = self.process_effects(raw_actions[i+2])
             action["del_eff"] = self.process_effects(raw_actions[i+3])
-            processed_actions[self.serialized["tasks"]["primitive"][i//4]] = action
+            processed_actions[self.serialized["tasks"][i//4]] = action
         self.serialized["actions"] = processed_actions
     # TODO: Complete this 
     # TODO: investigate what _splitting_method is in the output
@@ -42,38 +43,27 @@ class HTNSerializer:
         raw_methods = self.serialized["methods"]
         processed_methods = {}
         for i in range(0,len(raw_methods), 4):
-            name = raw_methods[i]
             method = {}
             # number of primitive tasks in network (for id)
             tasks = self.serialized["tasks"]
-            n_primitives = len(tasks["primitive"])
-            method["task"] = tasks["abstract"][int(raw_methods[i+1]) - n_primitives]
+            task_id = int(raw_methods[i+1])
+            method["task"] = tasks[task_id]
             subtask_ids = raw_methods[i+2].split()[:-1]
             subtask_names = [] 
-            for id in subtask_ids:
-                if int(id) > n_primitives:
-                    new_id = int(id) - n_primitives
-                    subtask_names.append(tasks["abstract"][new_id])
-                else:
-                    subtask_names.append(tasks["primitive"][int(id)])
-
+            for subtask_id in subtask_ids:
+                subtask_names.append(tasks[int(subtask_id)])
             method["subtasks"] = subtask_names
             orderings = raw_methods[i+3].split()[:-1]
             method["orderings"] = [(int(orderings[x]), int(orderings[x+1])) for x in range(0, len(orderings), 2)]
+            name = raw_methods[i] + "_" + str(i // 4)
             processed_methods[name] = method
         self.serialized["methods"] = processed_methods
     # Process tasks
     def process_tasks(self):
         raw_tasks = self.serialized["tasks"]
-        tasks = {
-            "abstract": [],
-            "primitive": []
-        }
-        for task in raw_tasks:
-            if task[0] == "0":
-                tasks["primitive"].append(task[2:])
-            else:
-                tasks["abstract"].append(task[2:])
+        tasks = {}
+        for i, task in enumerate(raw_tasks):
+            tasks[i] = task[2:]
         self.serialized["tasks"] = tasks
     # TODO: Add support for conditional effects
     def process_effects(self, effects):
@@ -112,11 +102,18 @@ class HTNSerializer:
         self.serialized["initial_state"] = facts
         initial_task_id = int(self.serialized["initial_abstract_task"][0])
         n_primitives = len(self.serialized["actions"].keys())
-        self.serialized["initial_abstract_task"] = self.serialized["tasks"]["abstract"][initial_task_id - n_primitives]
+        self.serialized["initial_abstract_task"] = self.serialized["tasks"][initial_task_id]
     def run(self):
         self.preprocess()
         self.process_tasks()
         self.process_actions()
         self.process_methods()
         self.process_init()
+        raw_tasks = self.serialized["tasks"]
+        tasks = { "primitive": [], "abstract": []}
+        for i in range(0, len(self.serialized["actions"])):
+            tasks["primitive"].append(raw_tasks[i])
+        for i in range(len(self.serialized["actions"]), len(raw_tasks)):
+            tasks["abstract"].append(raw_tasks[i])
+        self.serialized["tasks"] = tasks
         return self.serialized

@@ -26,6 +26,10 @@ impl HTN {
         }
     }
 
+    pub fn get_orderings(&self) -> Vec<(u32,u32)>{
+        self.network.get_edges()
+    }
+
     pub fn get_all_tasks(&self) -> Vec<Rc<Task>> {
         self.network.nodes.iter().map(|id| {
             self.get_task(*id).unwrap()

@@ -28,6 +28,7 @@ impl NodeStatus {
 
 impl ComputeTreeNode {
     pub fn mark(&mut self, i: u32) {
+        self.clear_marks();
         self.connections.as_mut().unwrap().mark(i)
     }
     pub fn get_marked_connection(&self) -> Option<&HyperArc> {
