@@ -217,6 +217,15 @@ impl HTN {
         self.mappings.remove(&id);
         self.mappings.insert(id, new_task);
     }
+
+    pub fn contains_task(&self, name: &str) -> bool {
+        for (_, task) in self.mappings.iter() {
+            if task.get_name() == name {
+                return true;
+            }
+        }
+        return false;
+    }
     
 }
 

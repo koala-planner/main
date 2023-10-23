@@ -13,5 +13,4 @@ pub use compute_tree::ComputeTree;
 pub use tree_node::{ComputeTreeNode, NodeStatus};
 use crate::domain_description::FONDProblem;
 use super::search_node::NodeExpansion;
-use super::search_node::Connector;
 use super::search_node::ConnectionLabel;

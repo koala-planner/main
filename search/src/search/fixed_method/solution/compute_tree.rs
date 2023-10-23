@@ -5,7 +5,7 @@ use std::collections::{HashMap, HashSet, LinkedList};
 use super::fm_policy::FMPolicy;
 use super::ConnectionLabel;
 use super::{connectors::NodeConnections, ComputeTreeNode, FONDProblem, SearchNode, SearchResult};
-use super::{Connector, HyperArc, NodeStatus, HTN};
+use super::{HyperArc, NodeStatus, HTN};
 use crate::relaxation::ToClassical;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -17,7 +17,7 @@ pub struct ComputeTree {
     pub ids: HashMap<u32, RefCell<ComputeTreeNode>>,
     pub root: u32,
     // Keeps teack of maximum u32 ID used in the tree
-    cursor: u32,
+    pub cursor: u32,
     // relaxed_domain: ToClassical,
 }
 
@@ -68,31 +68,33 @@ impl ComputeTree {
             let mut marked = HashSet::new();
             // Follow Markers
             for x in working_set.iter() {
-                let node = self.ids.get(x).unwrap().borrow();
                 let mut marker_update = None;
-                match &node.connections {
-                    Some(connection) => {
-                        let node_status = self.compute_node_status(*x);
-                        if node_status.is_terminal() {
-                            continue;
-                        }
-                        match connection.has_marked_connection() {
-                            Some(children) => {
-                                marked.extend(children.children.iter());
+                {
+                    let node = self.ids.get(x).unwrap().borrow();
+                    match &node.connections {
+                        Some(connection) => {
+                            let node_status = self.compute_node_status(*x);
+                            if node_status.is_terminal() {
+                                continue;
                             }
-                            None => {
-                                let (_, i) = self.compute_min_cost(connection);
-                                marked.extend(connection.children[i as usize].children.iter());
-                                marker_update = Some(i);
+                            match connection.has_marked_connection() {
+                                Some(children) => {
+                                    marked.extend(children.children.iter());
+                                }
+                                None => {
+                                    let (_, i) = self.compute_min_cost(connection);
+                                    marked.extend(connection.children[i as usize].children.iter());
+                                                                        marker_update = Some(i);
+                                }
                             }
                         }
+                        None => match node.label {
+                            NodeStatus::OnGoing => {
+                                tip_node_ids.insert(*x);
+                            }
+                            _ => {}
+                        },
                     }
-                    None => match node.label {
-                        NodeStatus::OnGoing => {
-                            tip_node_ids.insert(*x);
-                        }
-                        _ => {}
-                    },
                 }
                 if marker_update.is_some() {
                     let mut node = self.ids.get(x).unwrap().borrow_mut();
@@ -184,17 +186,7 @@ impl ComputeTree {
         match node.label {
             NodeStatus::Failed => {
                 node.cost = f32::INFINITY;
-                match node.parent_id {
-                    Some(p_id) => {
-                        let mut parent = self.ids.get(&p_id).unwrap().borrow_mut();
-                        parent.clear_marks();
-                        parent.cost = f32::INFINITY;
-                        return Some(p_id);
-                    }
-                    None => {
-                        return None;
-                    }
-                }
+                return node.parent_id;
             }
             NodeStatus::Solved => {
                 node.cost = 0.0;
@@ -205,6 +197,8 @@ impl ComputeTree {
                 match self.children_status(node.connections.as_ref().unwrap()) {
                     NodeStatus::Failed => {
                         node.label = NodeStatus::Failed;
+                        node.cost = f32::INFINITY;
+                        node.clear_marks();
                         return node.parent_id;
                     }
                     NodeStatus::Solved => {
@@ -250,9 +244,17 @@ impl ComputeTree {
         let (mut min_cost, mut arg_min) = (f32::INFINITY, u32::max_value());
         for (i, arc) in connections.children.iter().enumerate() {
             let mut branch_cost = arc.cost;
+            let mut is_solved = true;
             for child in arc.children.iter() {
                 let child = self.ids.get(child).unwrap().borrow();
                 branch_cost += child.cost;
+                match child.label {
+                    NodeStatus::Solved => {},
+                    _ => is_solved = false
+                }
+            }
+            if is_solved {
+                return (branch_cost, i as u32);
             }
             if branch_cost < min_cost {
                 min_cost = branch_cost;
@@ -306,7 +308,7 @@ impl ComputeTree {
 
 #[cfg(test)]
 mod tests {
-    use crate::task_network::{Task, PrimitiveAction};
+    use crate::{task_network::{Task, PrimitiveAction}, visualization::ToDOT};
 
     use super::*;
     fn generate_tree() -> ComputeTree {
@@ -478,7 +480,6 @@ mod tests {
             _ => {panic!("node label is incorrect")}
         }
         assert_eq!(parent_node.get_marked_connection().is_none(), true);
-        assert_eq!(parent_node.cost, f32::INFINITY);
         let root = tree.ids.get(&1).unwrap().borrow();
         match root.label {
             NodeStatus::OnGoing => {},

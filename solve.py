@@ -7,7 +7,7 @@ def solve(domain, problem):
     parser_path = path + "/parser/pandaPIparser"
     grounder_path = path + "/grounder/pandaPIgrounder/"
     serilazer_path = path + "/serializer/"
-    planner_path = path + "/search"
+    planner_path = path + "/search/"
     # Parsing
     parsed = subprocess.run(
         [ parser_path,
@@ -22,18 +22,18 @@ def solve(domain, problem):
         grounder_path + "parsed.htn",
         serilazer_path + "result.ground"], capture_output=True
     )
-    os.remove(grounder_path + "parsed.htn")
+    # os.remove(grounder_path + "parsed.htn")
     print("Grounding Complete.")
     # Serializing
     subprocess.run(
         ["python3", serilazer_path + "htn_parser.py",
          serilazer_path + "result.ground", planner_path + "result.json"],
         capture_output=False)
-    os.remove(serilazer_path + "result.ground")
+    # os.remove(serilazer_path + "result.ground")
     print("Conversion to JSON Complete.")
     # Search
     subprocess.run(
-        [planner_path, planner_path + "result.json"],
+        [planner_path + "target/debug/planner", planner_path + "result.json"],
         capture_output=False)
 
 if __name__ == "__main__":
