@@ -15,23 +15,24 @@ def solve(domain, problem):
          capture_output=True)
     with open(grounder_path + "parsed.htn", "w+") as f:
         f.write(parsed.stdout.decode("utf-8"))
-    print("Parsing Complete.")
+    print("<<<<<<<<<< Parsing Complete >>>>>>>>>>")
     # Grounding
-    grounded = subprocess.run(
+    subprocess.run(
         [grounder_path + "pandaPIgrounder",
         grounder_path + "parsed.htn",
-        serilazer_path + "result.ground"], capture_output=True
+        serilazer_path + "result.ground"], capture_output=False
     )
-    # os.remove(grounder_path + "parsed.htn")
-    print("Grounding Complete.")
+    os.remove(grounder_path + "parsed.htn")
+    print("<<<<<<<<<< Grounding Complete >>>>>>>>>>")
     # Serializing
     subprocess.run(
         ["python3", serilazer_path + "htn_parser.py",
          serilazer_path + "result.ground", planner_path + "result.json"],
         capture_output=False)
     # os.remove(serilazer_path + "result.ground")
-    print("Conversion to JSON Complete.")
+    print("<<<<<<<<<< Conversion to JSON Complete >>>>>>>>>>")
     # Search
+    print("<<<<<<<<<< Starting Search >>>>>>>>>>")
     subprocess.run(
         [planner_path + "target/debug/planner", planner_path + "result.json"],
         capture_output=False)

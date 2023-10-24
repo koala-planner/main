@@ -23,25 +23,27 @@ impl FMPolicy {
             // Is node terminal?
             match &node.connections {
                 Some(connection) => {
-                    let marked = connection.has_marked_connection().unwrap();
-                    // Check whether transition is decomposition or primitive action execution
-                    match &marked.action_type {
-                        ConnectionLabel::Decomposition(_) => {
-                            for child in marked.children.iter(){
-                                working_set.push_back((*child, Rc::clone(&history)));
-                            }
-                        },
-                        ConnectionLabel::Execution(name, cost) => {
-                            let state = node.search_node.state.as_ref().clone();
-                            policy.push((state, history.clone(), name.clone()));
-                            let mut new_history = history.as_ref().clone();
-                            new_history.push(name.clone());
-                            let new_history = Rc::new(new_history);
-                            for child in marked.children.iter() {
-                                working_set.push_back((*child, Rc::clone(&new_history)));
+                    if let Some(marked) = connection.has_marked_connection() {
+                        // Check whether transition is decomposition or primitive action execution
+                        match &marked.action_type {
+                            ConnectionLabel::Decomposition(_) => {
+                                for child in marked.children.iter(){
+                                    working_set.push_back((*child, Rc::clone(&history)));
+                                }
+                            },
+                            ConnectionLabel::Execution(name, cost) => {
+                                let state = node.search_node.state.as_ref().clone();
+                                policy.push((state, history.clone(), name.clone()));
+                                let mut new_history = history.as_ref().clone();
+                                new_history.push(name.clone());
+                                let new_history = Rc::new(new_history);
+                                for child in marked.children.iter() {
+                                    working_set.push_back((*child, Rc::clone(&new_history)));
+                                }
                             }
                         }
                     }
+                    // TODO: consider the other possibility
                 }
                 None => { }
             } 

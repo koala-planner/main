@@ -1,6 +1,7 @@
 use crate::domain_description::ClassicalDomain;
 use crate::relaxation::{DeleteRelaxation, OutcomeDeterminizer};
 use std::collections::{HashMap, HashSet, LinkedList};
+use std::vec;
 
 use super::fm_policy::FMPolicy;
 use super::ConnectionLabel;
@@ -18,7 +19,7 @@ pub struct ComputeTree {
     pub root: u32,
     // Keeps teack of maximum u32 ID used in the tree
     pub cursor: u32,
-    // relaxed_domain: ToClassical,
+    relaxed_domain: Option<ToClassical>,
 }
 
 impl ComputeTree {
@@ -33,13 +34,13 @@ impl ComputeTree {
             cost: 0.0,
             status: NodeStatus::OnGoing,
         };
-        // let outcome_det = OutcomeDeterminizer::htn(&problem);
-        // let relaxed = ToClassical::new(&outcome_det);
+        let outcome_det = OutcomeDeterminizer::htn(&problem);
+        let relaxed = ToClassical::new(&outcome_det);
         ComputeTree {
             ids: HashMap::from([(1, RefCell::new(compute_node))]),
             root: 1,
             cursor: 2,
-            // relaxed_domain: relaxed,
+            relaxed_domain: Some(relaxed),
         }
     }
 
@@ -52,7 +53,7 @@ impl ComputeTree {
         }
     }
 
-    pub fn get_max_cost_node(&self, nodes: &HashSet<u32>) -> u32 {
+    pub fn get_max_cost_node(&self, nodes: &Vec<u32>) -> u32 {
         let (mut argmax, mut max_cost) = (u32::MAX, f32::INFINITY);
         for id in nodes.iter() {
             let cost = self.ids.get(id).unwrap().borrow().cost;
@@ -76,11 +77,11 @@ impl ComputeTree {
         }
     }
 
-    pub fn get_tip_nodes(&self) -> HashSet<u32> {
-        let mut working_set = HashSet::from([self.root]);
-        let mut tip_node_ids: HashSet<u32> = HashSet::new();
+    pub fn get_tip_nodes(&self) -> Vec<u32> {
+        let mut working_set = vec![self.root];
+        let mut tip_node_ids = vec![];
         while !working_set.is_empty() {
-            let mut marked = HashSet::new();
+            let mut marked = vec![];
             // Follow Markers
             for x in working_set.iter() {
                 let mut marker_update = None;
@@ -105,7 +106,7 @@ impl ComputeTree {
                         }
                         None => match node.status {
                             NodeStatus::OnGoing => {
-                                tip_node_ids.insert(*x);
+                                tip_node_ids.push(*x);
                             }
                             _ => {}
                         },
@@ -129,8 +130,10 @@ impl ComputeTree {
         let mut node = self.ids.get_mut(&id).unwrap().borrow_mut();
         if node.search_node.is_goal() {
             node.status = NodeStatus::Solved;
+            node.cost = 0.0;
         } else {
             node.status = NodeStatus::Failed;
+            node.cost = f32::INFINITY;
         }
     }
 
@@ -142,7 +145,6 @@ impl ComputeTree {
             self.mark_as_terminal(id);
             return;
         }
-        println!("WARNING, heuristics disabled");
         // Process node expansion to the desired format
         let expansions: Vec<(Vec<ComputeTreeNode>, ConnectionLabel)> = node_successors
             .into_iter()
@@ -151,14 +153,22 @@ impl ComputeTree {
                     x.items
                         .into_iter()
                         .map(|y| {
-                            let h = 0.0; //y.compute_heuristic_value(&self.relaxed_domain);
-                            let child_label = NodeStatus::OnGoing;
+                            let mut h = 0.0;
+                            if self.relaxed_domain.is_some() {
+                                h = y.compute_heuristic_value(&self.relaxed_domain.as_ref().unwrap());
+                            }
+                            let mut child_label = NodeStatus::OnGoing;
+                            if h == f32::INFINITY {
+                                child_label = NodeStatus::Failed;
+                            } else if y.is_goal(){
+                                child_label = NodeStatus::Solved;
+                            }
                             ComputeTreeNode {
                                 parent_id: Some(id),
                                 search_node: y,
                                 connections: None,
                                 cost: h,
-                                status: NodeStatus::OnGoing,
+                                status: child_label,
                             }
                         })
                         .collect::<Vec<ComputeTreeNode>>(),
@@ -425,6 +435,7 @@ mod tests {
             ]),
             root: 1,
             cursor: 9,
+            relaxed_domain: None
         }
     }
 

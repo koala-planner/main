@@ -14,10 +14,9 @@ impl SearchNode {
     }
     
     pub fn compute_heuristic_value(&self, encoder: &ToClassical) -> f32 {
-        // let relaxed_state = encoder.compute_relaxed_state(&self.tn, self.state.as_ref());
-        // let goal_state = encoder.compute_goal_state(&self.tn);
-        // FF::calculate_h(&encoder.domain, &relaxed_state, &goal_state)
-        0.0
+        let relaxed_state = encoder.compute_relaxed_state(&self.tn, self.state.as_ref());
+        let goal_state = encoder.compute_goal_state(&self.tn);
+        FF::calculate_h(&encoder.domain, &relaxed_state, &goal_state)
     }
 
     pub fn is_goal(&self) -> bool {
@@ -92,7 +91,7 @@ impl SearchNode {
                     Rc::new(new_tn),
                 );
                 let expansion = NodeExpansion {
-                    connection_label: ConnectionLabel::Decomposition(t.name.clone()),
+                    connection_label: ConnectionLabel::Decomposition(method.name.clone()),
                     items: vec![new_search_node],
                 };
                 expansions.push(expansion);
@@ -121,6 +120,34 @@ impl ConnectionLabel {
         match  &self {
             ConnectionLabel::Decomposition(_) => true,
             _ => false
+        }
+    }
+
+    pub fn get_label(&self) -> String {
+        match self {
+            Self::Execution(name, _) => name.clone(),
+            Self::Decomposition(name) => name.clone()
+        }
+    }
+}
+
+impl PartialEq for ConnectionLabel {
+    fn eq(&self, rhs: &ConnectionLabel) -> bool {
+        match self {
+            Self::Execution(name, _) => {
+                if let ConnectionLabel::Execution(name_rhs, _) = rhs {
+                    return name == name_rhs;
+                } else {
+                    false
+                }
+            },
+            Self::Decomposition(name) => {
+                if let ConnectionLabel::Decomposition(name_rhs) = rhs {
+                    return name == name_rhs;
+                } else {
+                    false
+                }
+            }
         }
     }
 }

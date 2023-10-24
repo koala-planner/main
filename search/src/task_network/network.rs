@@ -236,7 +236,14 @@ impl fmt::Display for HTN {
         for (i, layer) in layers.iter().enumerate() {
             write!(f, "layer {}:\n", i);
             for task in layer.iter() {
-                write!(f, "\t{}\n", task);
+                write!(f, "\t{}", task);
+                if let Task::Compound(CompoundTask { name: _, methods }) = task {
+                    for method in methods.iter() {
+                        write!(f, "\t\t(M) {}\n", method.name);
+                    }
+                } else {
+                    write!(f, "\n");
+                }
             }
         }
         Ok(())

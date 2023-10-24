@@ -2,18 +2,19 @@ use std::collections::{HashSet, LinkedList, HashMap};
 use crate::domain_description::ClassicalDomain;
 
 #[derive(Debug, Clone)]
-pub struct GraphPlan {
+pub struct GraphPlan<'a>{
     pub actions: HashMap<usize, u32>,
     pub facts: HashMap<u32, u32>,
     pub depth: u32,
+    domain: &'a ClassicalDomain
 }
 
-impl GraphPlan {
+impl<'a> GraphPlan <'a>{
     // returns the membership index for alternating facts and actions layer as a
     // tuple ((action_id->first occurance layer number), (fact_id -> first occurance index))
     // returns None if there is no solution
-    pub fn build_graph(domain: &ClassicalDomain, state: &HashSet<u32>, goal: &HashSet<u32>)
-        -> Option<GraphPlan>{
+    pub fn build_graph(domain: &'a ClassicalDomain, state: &HashSet<u32>, goal: &HashSet<u32>)
+        -> Option<GraphPlan<'a>>{
         // initiate first action occurance index in the graphplan to infinity
         // mapping is of the form (action id -> (precond_counter, first occurance) 
         let mut action_membership: HashMap<usize, (u32, u32)> = HashMap::new();
@@ -35,6 +36,14 @@ impl GraphPlan {
         while !GraphPlan::all_goals_satisfied(&fact_membership, goal) {
             // no new facts have been generated
             if layer_facts.len() == 0 {
+                // let actions = HashMap::from(
+                //     action_membership
+                //     .iter()
+                //     .map(|(k,(c, i))| (k.clone(),i.clone()))
+                //     .collect::<HashMap<usize, u32>>()
+                // );
+                // println!("{}",
+                // GraphPlan { actions: actions, facts: fact_membership, depth: layer_num, domain: domain});
                 return None;
             }
             layer_num += 1;
@@ -87,7 +96,7 @@ impl GraphPlan {
             .map(|(k,(c, i))| (k.clone(),i.clone()))
             .collect::<HashMap<usize, u32>>()
         );
-        Some(GraphPlan { actions: actions, facts: fact_membership, depth: layer_num })
+        Some(GraphPlan { actions: actions, facts: fact_membership, depth: layer_num, domain: domain})
     }
 
     fn all_goals_satisfied(indices: &HashMap<u32, u32>, goal: &HashSet<u32>) -> bool {
@@ -134,6 +143,36 @@ impl GraphPlan {
         self.facts.iter().filter(|(id, layer)| {
             **layer == index
         }).map(|(id, layer)| id).cloned().collect()
+    }
+}
+
+impl <'a> std::fmt::Display for GraphPlan<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        write!(f, "digraph G {{\n\trankdir=\"LR\"\n");
+        for layer in 0..self.depth {
+            if layer % 2 == 0 {
+                let ids = self.get_fact_layer(layer);
+                let facts: Vec<&String> = ids.iter().map(|x| {
+                        self.domain.facts.get_fact(*x)
+                    }).collect();
+                write!(f, "\tsubgraph cluster{} {{\n\t\tlabel=\"layer{}\"\n\t\tstyle=filled;\n\t\tcolor=lightgrey;\n", layer, layer);
+                for (id, fact) in ids.iter().zip(facts.iter()) {
+                    write!(f, "\t\t{} [label=\"{}\",shape=box]\n", id, fact);
+                }
+            } else {
+                let ids = self.get_action_layer(layer);
+                let actions: Vec<&String> = ids.iter().map(|x| {
+                    &self.domain.actions[*x].name
+                }).collect();
+                write!(f, "\tsubgraph cluster{} {{\n\t\tlabel=\"layer{}\"\n", layer, layer);
+                for (id, action) in ids.iter().zip(actions.iter()) {
+                    write!(f, "\t\t{} [label=\"{}\",shape=box]\n", id, action);
+                }
+            }
+            write!(f, "\t}}\n");
+        }
+        write!(f, "}}\n");
+        Ok(())
     }
 }
 
