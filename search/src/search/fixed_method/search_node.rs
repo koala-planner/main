@@ -1,4 +1,4 @@
-use std::{collections::HashSet, rc::Rc, cell::RefCell};
+use std::{collections::{HashSet, BTreeSet}, rc::Rc, cell::RefCell};
 use crate::{task_network::Applicability, relaxation::ToClassical, heuristic_calculator::FF};
 
 use super::{HTN, PrimitiveAction, Task, CompoundTask};
@@ -42,7 +42,7 @@ impl SearchNode {
 
     fn expand_primitives(
         &self,
-        primitive_tasks: HashSet<u32>
+        primitive_tasks: BTreeSet<u32>
     )-> Vec<NodeExpansion> {
         let mut expansion = vec![];
         for t in primitive_tasks.iter() {
@@ -191,12 +191,12 @@ mod tests {
         let m1 = Method::new(
             "m1".to_string(),
             HTN::new(
-                HashSet::from([1,2]), vec![(1,2)], HashMap::from([(1, p1.clone()), (2, p2.clone())]))
+                BTreeSet::from([1,2]), vec![(1,2)], HashMap::from([(1, p1.clone()), (2, p2.clone())]))
         );
         let m2 = Method::new(
             "m2".to_string(),
             HTN::new(
-                HashSet::from([1,2]), vec![], HashMap::from([(1, p3.clone()), (2, p4.clone())]))
+                BTreeSet::from([1,2]), vec![], HashMap::from([(1, p3.clone()), (2, p4.clone())]))
         );
         let t1 = Rc::new(Task::Compound(CompoundTask::new(
             "t1".to_string(),
@@ -204,7 +204,7 @@ mod tests {
         )));
 
         let tn = HTN::new(
-            HashSet::from([1, 2, 3, 4]), 
+            BTreeSet::from([1, 2, 3, 4]), 
             vec![(1,4), (2,4), (3,4)],
             HashMap::from([
                 (1, p1), (2, t1), (3, p3), (4, p4)

@@ -1,6 +1,6 @@
 use super::{HTN, Task, PrimitiveAction, CompoundTask};
 use crate::{domain_description::{FONDProblem, DomainTasks}, task_network::Method};
-use std::{rc::Rc, collections::{HashSet, HashMap}, ops::Index};
+use std::{rc::Rc, collections::{HashSet, HashMap, BTreeSet}, ops::Index};
 
 pub struct OutcomeDeterminizer {}
 
@@ -97,7 +97,7 @@ impl OutcomeDeterminizer {
                 ]
             }));
             let new_tn = HTN::new(
-                HashSet::from([1]),
+                BTreeSet::from([1]),
                 vec![],
                 HashMap::from([(1, new_top)])
             );
@@ -120,7 +120,7 @@ impl OutcomeDeterminizer {
             let new_method = Method::new(
                 new_action.name.clone() + "__method_" + &i.to_string(),
                 HTN::new(
-                    HashSet::from([1]),
+                    BTreeSet::from([1]),
                     vec![],
                     HashMap::from(
                         [(1, Rc::new(Task::Primitive(new_action)))]
@@ -171,14 +171,14 @@ mod tests {
             methods: vec![
                 Method::new(
                     "t1_m".to_string(),
-                    HTN::new(HashSet::from([2, 3]), vec![], HashMap::from([
+                    HTN::new(BTreeSet::from([2, 3]), vec![], HashMap::from([
                         (2, Rc::clone(&p2)), (3, Rc::clone(&p3))
                     ]))
                 )
             ] 
         }));
         let tn = HTN::new(
-            HashSet::from([1,2,3]),
+            BTreeSet::from([1,2,3]),
             vec![(1,3), (2,3)],
             HashMap::from(
                 [(1, Rc::clone(&p1)), (2, Rc::clone(&t1)), (3, Rc::clone(&p2))]

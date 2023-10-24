@@ -9,6 +9,8 @@ use super::{AOStarSearch, FONDProblem};
 #[cfg(test)]
 #[test]
 pub fn decomposition_test() {
+    use std::collections::BTreeSet;
+
     use crate::domain_description::{Facts, DomainTasks};
 
     let p1 = Rc::new(Task::Primitive(PrimitiveAction::new(
@@ -44,7 +46,7 @@ pub fn decomposition_test() {
         methods: vec![
             Method::new(
                 "t4_m".to_string(),
-                HTN::new(HashSet::from([2, 3]), vec![], HashMap::from([
+                HTN::new(BTreeSet::from([2, 3]), vec![], HashMap::from([
                     (2, Rc::clone(&p2)), (3, Rc::clone(&p3))
                 ]))
             )
@@ -56,7 +58,7 @@ pub fn decomposition_test() {
             Method::new(
                 "t3_m".to_string(),
                 HTN::new(
-                    HashSet::from([1, 2]),
+                    BTreeSet::from([1, 2]),
                     vec![(1,2)],
                     HashMap::from([
                         (1, Rc::clone(&p2)), (2, Rc::clone(&p2))
@@ -71,7 +73,7 @@ pub fn decomposition_test() {
             Method::new(
                 "t2_m".to_string(),
                 HTN::new(
-                    HashSet::from([4, 3]),
+                    BTreeSet::from([4, 3]),
                     vec![(4,3)],
                     HashMap::from([
                         (4, Rc::clone(&p4)), (3, Rc::clone(&p3))
@@ -86,7 +88,7 @@ pub fn decomposition_test() {
             Method::new(
                 "t1_m".to_string(),
                 HTN::new(
-                    HashSet::from([1, 4]),
+                    BTreeSet::from([1, 4]),
                     vec![],
                     HashMap::from([
                         (1, Rc::clone(&p1)), (4, Rc::clone(&t4))
@@ -96,7 +98,7 @@ pub fn decomposition_test() {
         ] 
     }));
     let init_tn = HTN::new(
-        HashSet::from([1,2,3]),
+        BTreeSet::from([1,2,3]),
         vec![(1, 3), (2, 3)],
         HashMap::from([
             (1, Rc::clone(&t1)), (2, Rc::clone(&t2)), (3, Rc::clone(&t3))

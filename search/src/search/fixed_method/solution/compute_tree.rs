@@ -333,6 +333,8 @@ impl ComputeTree {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeSet;
+
     use crate::{task_network::{Task, PrimitiveAction}, visualization::ToDOT};
 
     use super::*;
@@ -340,7 +342,7 @@ mod tests {
         let dummy_search_node = SearchNode {
             state: Rc::new(HashSet::new()),
             tn: Rc::new(HTN::new(
-                HashSet::new(), vec![], HashMap::new()
+                BTreeSet::new(), vec![], HashMap::new()
             ))
         };
         let dummy_action = Rc::new(Task::Primitive(PrimitiveAction::new(
@@ -403,7 +405,7 @@ mod tests {
             search_node: SearchNode::new(
                 Rc::new(HashSet::new()),
                 Rc::new(HTN::new(
-                    HashSet::from([1]), 
+                    BTreeSet::from([1]), 
                     vec![],
                     HashMap::from([
                         (1, dummy_action.clone())
@@ -490,7 +492,7 @@ mod tests {
             node.search_node = SearchNode {
                 state: Rc::new(HashSet::new()),
                 tn: Rc::new(HTN::new(
-                    HashSet::from([1]), 
+                    BTreeSet::from([1]), 
                     vec![],
                     HashMap::from([(1, Rc::new(action))])
                 ))

@@ -1,5 +1,5 @@
 use crate::{domain_description::{FONDProblem, DomainTasks}, task_network::{Task, HTN}};
-use std::{rc::Rc, collections::HashMap};
+use std::{rc::Rc, collections::{HashMap, BTreeSet}};
 use super::{CompoundTask, Method};
 use std::collections::HashSet;
 pub struct DeleteRelaxation {
@@ -52,7 +52,7 @@ impl DeleteRelaxation {
                 ]
             }));
             let new_tn = HTN::new(
-                HashSet::from([1]),
+                BTreeSet::from([1]),
                 vec![],
                 HashMap::from([(1, new_top)])
             );
@@ -100,14 +100,14 @@ mod tests {
             methods: vec![
                 Method::new(
                     "t1_m".to_string(),
-                    HTN::new(HashSet::from([2, 3]), vec![], HashMap::from([
+                    HTN::new(BTreeSet::from([2, 3]), vec![], HashMap::from([
                         (2, Rc::clone(&p2)), (3, Rc::clone(&p3))
                     ]))
                 )
             ] 
         }));
         let tn = HTN::new(
-            HashSet::from([1,2,3]),
+            BTreeSet::from([1,2,3]),
             vec![(1,3), (2,3)],
             HashMap::from(
                 [(1, Rc::clone(&p1)), (2, Rc::clone(&t1)), (3, Rc::clone(&p3))]

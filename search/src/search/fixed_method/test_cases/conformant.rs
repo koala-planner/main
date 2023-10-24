@@ -9,6 +9,8 @@ use super::{AOStarSearch, FONDProblem};
 #[cfg(test)]
 #[test]
 pub fn conformant_test() {
+    use std::collections::BTreeSet;
+
     use crate::domain_description::{Facts, DomainTasks};
 
     let p1 = Rc::new(Task::Primitive(PrimitiveAction::new(
@@ -33,7 +35,7 @@ pub fn conformant_test() {
         vec![HashSet::new(),]
     )));
     let tn = HTN::new(
-        HashSet::from([1,2,3]),
+        BTreeSet::from([1,2,3]),
         vec![(1,3), (2,3)],
         HashMap::from(
             [(1, p1.clone()), (2,p2.clone()), (3, p3.clone())]

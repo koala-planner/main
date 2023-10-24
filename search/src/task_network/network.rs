@@ -1,6 +1,6 @@
 use super::Graph;
 use super::task_structs::{CompoundTask, Method, PrimitiveAction, Task};
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, BTreeSet};
 use std::fmt::{self, write};
 use rand::distributions::DistString;
 use std::hash::Hash;
@@ -16,7 +16,7 @@ pub struct HTN{
 
 impl HTN {
     pub fn new(
-        tasks: HashSet<u32>,
+        tasks: BTreeSet<u32>,
         orderings: Vec<(u32, u32)>,
         mappings: HashMap<u32, Rc<Task>>,
     ) -> HTN {
@@ -57,11 +57,11 @@ impl HTN {
         }
     }
 
-    pub fn get_unconstrained_tasks(&self) -> HashSet<u32> {
+    pub fn get_unconstrained_tasks(&self) -> BTreeSet<u32> {
         self.network.get_unconstrained_nodes()
     }
 
-    pub fn get_incoming_edges(&self, id: u32) -> HashSet<u32> {
+    pub fn get_incoming_edges(&self, id: u32) -> BTreeSet<u32> {
         self.network.get_incoming_edges(id)
     }
 
@@ -71,7 +71,7 @@ impl HTN {
         let mut subgraph_edges = method.decomposition.network.edges.clone();
         let mut subgraph_mappings = method.decomposition.mappings.clone();
         if !subgraph_nodes.is_disjoint(&self.network.nodes) {
-            let intersection: HashSet<u32> =
+            let intersection: BTreeSet<u32> =
                 method.decomposition.mappings.keys().cloned().collect();
             let network_max_id = self.network.nodes.iter().fold(u32::MIN, |a, b| a.max(*b));
             let max_id = subgraph_nodes.iter().fold(network_max_id, |a, b| a.max(*b));
@@ -80,7 +80,7 @@ impl HTN {
                 let mapping_val = subgraph_mappings.remove(&prev_id).unwrap();
                 subgraph_mappings.insert(*new_id, mapping_val);
                 if subgraph_edges.contains_key(&prev_id) {
-                    let edges: HashSet<u32> = subgraph_edges.remove(&prev_id).unwrap();
+                    let edges: BTreeSet<u32> = subgraph_edges.remove(&prev_id).unwrap();
                     let mapped_edges = edges.into_iter().map(|x| {
                         if new_ids.contains_key(&x) {
                             *new_ids.get(&x).unwrap()
@@ -120,7 +120,7 @@ impl HTN {
             .iter()
             .filter(|x| **x != id)
             .cloned()
-            .collect::<HashSet<u32>>()
+            .collect::<BTreeSet<u32>>()
             .union(&subgraph_nodes)
             .cloned()
             .collect();
@@ -170,10 +170,10 @@ impl HTN {
     }
 
     // given a set U, separate ids into tuple (compound, primitive)
-    pub fn separate_tasks(&self, tasks: &HashSet<u32>)
-    -> (HashSet<u32>, HashSet<u32>) {
-        let mut u_c = HashSet::new();
-        let mut u_a = HashSet::new();
+    pub fn separate_tasks(&self, tasks: &BTreeSet<u32>)
+    -> (BTreeSet<u32>, BTreeSet<u32>) {
+        let mut u_c = BTreeSet::new();
+        let mut u_a = BTreeSet::new();
         for t in tasks.iter() {
             if self.is_primitive(*t) {
                 u_a.insert(*t);
@@ -199,13 +199,13 @@ impl HTN {
         let mut new_mappings = self.mappings.clone();
         new_mappings.insert(max_id, Rc::new(new_task));
         HTN::new(
-            HashSet::from([max_id]), 
+            BTreeSet::from([max_id]), 
             vec![], 
             new_mappings
         )
     }
 
-    pub fn get_nodes(&self) -> &HashSet<u32> {
+    pub fn get_nodes(&self) -> &BTreeSet<u32> {
         &self.network.nodes
     }
 
@@ -284,7 +284,7 @@ mod tests {
 
     #[test]
     fn instantiation() {
-        let t: HashSet<u32> = HashSet::from([1, 2, 3, 4]);
+        let t: BTreeSet<u32> = BTreeSet::from([1, 2, 3, 4]);
         let (t1, t2, t3, t4) = create_initial_tasks();
         let alpha =
             HashMap::from([(1, Rc::clone(&t1)), (2, Rc::clone(&t2)), (3, Rc::clone(&t3)), (4, Rc::clone(&t4))]);
@@ -346,25 +346,25 @@ mod tests {
 
     #[test]
     fn unconstrained_tasks_test() {
-        let t: HashSet<u32> = HashSet::from([1, 2, 3, 4]);
+        let t: BTreeSet<u32> = BTreeSet::from([1, 2, 3, 4]);
         let (t1, t2, t3, t4) = create_initial_tasks();
         let alpha =
             HashMap::from([(1, t1), (2, t2), (3, t3), (4, t4)]);
         let orderings: Vec<(u32, u32)> = Vec::from([(1, 3), (2, 3), (3, 4)]);
         let network = HTN::new(t, orderings, alpha);
         let unconstrained = network.get_unconstrained_tasks();
-        assert_eq!(unconstrained, HashSet::from([1, 2]));
+        assert_eq!(unconstrained, BTreeSet::from([1, 2]));
     }
 
     #[test]
     fn decomposition_test() {
-        let t: HashSet<u32> = HashSet::from([1, 2, 3, 4]);
+        let t: BTreeSet<u32> = BTreeSet::from([1, 2, 3, 4]);
         let (t1, t2, t3, t4) = create_initial_tasks();
         let (t5, t6, t7, t8, t9) = decomposition_tasks();
         let t3_method = Method::new(
             "method-01".to_string(),
             HTN::new(
-                HashSet::from([1, 2, 3, 4, 5]),
+                BTreeSet::from([1, 2, 3, 4, 5]),
                 Vec::from([(1, 2), (2, 3), (2, 4), (3, 5), (4, 5)]),
                 HashMap::from(
                     [(1, Rc::new(t5)), (2, Rc::new(t6)), (3, Rc::new(t7)), (4, Rc::new(t8)), (5, Rc::new(t9))]
@@ -376,7 +376,7 @@ mod tests {
         let network = HTN::new(t, orderings, alpha);
         let result = network.decompose(3, &t3_method);
         assert_eq!(result.count_tasks(), 8);
-        assert_eq!(result.get_unconstrained_tasks(), HashSet::from([1, 2]));
+        assert_eq!(result.get_unconstrained_tasks(), BTreeSet::from([1, 2]));
         assert_eq!(Graph::convert_edges_to_vec(&result.network.edges).len(), 8);
         assert_eq!(result.get_task(3), None);
         assert_eq!(result.network.edges.get(&1).unwrap().len(), 1);
@@ -386,7 +386,7 @@ mod tests {
     pub fn isomorphism_test() {
         let (t1, t2, t3, t4) = create_initial_tasks();
         // first graph
-        let nodes1: HashSet<u32> = HashSet::from([1, 2, 3, 4]);
+        let nodes1: BTreeSet<u32> = BTreeSet::from([1, 2, 3, 4]);
         let orderings1: Vec<(u32, u32)> = Vec::from([(1, 3), (2, 3), (3, 4)]);
         let alpha =
         HashMap::from([(1, t1), (2, t2), (3, t3), (4, t4)]);
@@ -398,7 +398,7 @@ mod tests {
 
         let (t5, t6, t7, t8) = create_initial_tasks();
         // second graph
-        let nodes2: HashSet<u32> = HashSet::from([5, 6, 7, 8]);
+        let nodes2: BTreeSet<u32> = BTreeSet::from([5, 6, 7, 8]);
         let orderings2: Vec<(u32, u32)> = Vec::from([(5, 7), (6, 7), (7, 8)]);
         let htn2 = HTN::new(
             nodes2,
@@ -414,7 +414,7 @@ mod tests {
     pub fn is_primitive_test() {
         let (t1, t2, t3, t4) = create_initial_tasks();
         // first graph
-        let nodes1: HashSet<u32> = HashSet::from([1, 2, 3, 4]);
+        let nodes1: BTreeSet<u32> = BTreeSet::from([1, 2, 3, 4]);
         let orderings1: Vec<(u32, u32)> = Vec::from([(1, 3), (2, 3), (3, 4)]);
         let alpha =
         HashMap::from([(1, t1), (2, t2), (3, t3), (4, t4)]);
@@ -433,7 +433,7 @@ mod tests {
     pub fn apply_action_test() {
         let (t1, t2, t3, t4) = create_initial_tasks();
         // first graph
-        let nodes1: HashSet<u32> = HashSet::from([1, 2, 3, 4]);
+        let nodes1: BTreeSet<u32> = BTreeSet::from([1, 2, 3, 4]);
         let orderings1: Vec<(u32, u32)> = Vec::from([(1, 3), (2, 3), (3, 4)]);
         let alpha =
         HashMap::from([(1, t1), (2, t2), (3, t3), (4, t4)]);
@@ -458,7 +458,7 @@ mod tests {
     pub fn last_action_test() {
         let (t1, t2, t3, t4) = create_initial_tasks();
         // first graph
-        let nodes1: HashSet<u32> = HashSet::from([1, 2, 4]);
+        let nodes1: BTreeSet<u32> = BTreeSet::from([1, 2, 4]);
         let orderings1: Vec<(u32, u32)> = Vec::from([(1, 4), (2, 4)]);
         let alpha =
         HashMap::from([(1, t1), (2, t2), (4, t4)]);
@@ -476,7 +476,7 @@ mod tests {
     #[test]
     pub fn is_empty() {
         let (t1, t2, t3, t4) = create_initial_tasks();
-        let nodes: HashSet<u32> = HashSet::from([1, 2, 4]);
+        let nodes: BTreeSet<u32> = BTreeSet::from([1, 2, 4]);
         let orderings: Vec<(u32, u32)> = Vec::from([(1, 4), (2, 4)]);
         let alpha =
         HashMap::from([(1, t1), (2, t2), (4, t4)]);
@@ -488,7 +488,7 @@ mod tests {
         assert_eq!(htn.is_empty(), false);
 
         let empty_htn = HTN::new(
-            HashSet::new(),
+            BTreeSet::new(),
             Vec::new(),
             HashMap::new(),
         );
@@ -497,7 +497,7 @@ mod tests {
 
     #[test]
     pub fn separate_tasks_test() {
-        let t: HashSet<u32> = HashSet::from([1, 2, 3, 4]);
+        let t: BTreeSet<u32> = BTreeSet::from([1, 2, 3, 4]);
         let (t1, t2, t3, t4) = create_initial_tasks();
         let alpha =
             HashMap::from([(1, Rc::clone(&t1)), (2, Rc::clone(&t2)), (3, Rc::clone(&t3)), (4, Rc::clone(&t4))]);
@@ -505,13 +505,13 @@ mod tests {
         let network = HTN::new(t.clone(), orderings, alpha);
         assert_eq!(
             network.separate_tasks(&t),
-            (HashSet::from([3]), HashSet::from([1,2,4]))
+            (BTreeSet::from([3]), BTreeSet::from([1,2,4]))
         );
     }
 
     #[test]
     pub fn collapse_tn_test() {
-        let t: HashSet<u32> = HashSet::from([1, 2, 3, 4]);
+        let t: BTreeSet<u32> = BTreeSet::from([1, 2, 3, 4]);
         let (t1, t2, t3, t4) = create_initial_tasks();
         let alpha =
             HashMap::from([(1, Rc::clone(&t1)), (2, Rc::clone(&t2)), (3, Rc::clone(&t3)), (4, Rc::clone(&t4))]);
@@ -519,6 +519,6 @@ mod tests {
         let network = HTN::new(t.clone(), orderings, alpha);
         let new_tn = network.collapse_tn();
         assert_eq!(new_tn.count_tasks(), 1);
-        assert_eq!(new_tn.get_unconstrained_tasks(), HashSet::from([5]));
+        assert_eq!(new_tn.get_unconstrained_tasks(), BTreeSet::from([5]));
     } 
 }

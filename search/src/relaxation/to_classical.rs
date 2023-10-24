@@ -134,7 +134,7 @@ impl ToClassical {
 mod tests {
     use super::*;
     use super::super::{Method, CompoundTask};
-    use std::collections::HashMap;
+    use std::collections::{HashMap, BTreeSet};
     use crate::domain_description::DomainTasks;
     fn generate_problem() -> FONDProblem {
         let p1 = Rc::new(Task::Primitive(PrimitiveAction::new(
@@ -170,7 +170,7 @@ mod tests {
             methods: vec![
                 Method::new(
                     "t4_m".to_string(),
-                    HTN::new(HashSet::from([2, 3]), vec![], HashMap::from([
+                    HTN::new(BTreeSet::from([2, 3]), vec![], HashMap::from([
                         (2, Rc::clone(&p2)), (3, Rc::clone(&p3))
                     ]))
                 )
@@ -182,7 +182,7 @@ mod tests {
                 Method::new(
                     "t3_m".to_string(),
                     HTN::new(
-                        HashSet::from([1, 2]),
+                        BTreeSet::from([1, 2]),
                         vec![(1,2)],
                         HashMap::from([
                             (1, Rc::clone(&p2)), (2, Rc::clone(&p2))
@@ -197,7 +197,7 @@ mod tests {
                 Method::new(
                     "t2_m".to_string(),
                     HTN::new(
-                        HashSet::from([4, 3]),
+                        BTreeSet::from([4, 3]),
                         vec![(4,3)],
                         HashMap::from([
                             (4, Rc::clone(&p4)), (3, Rc::clone(&p3))
@@ -212,7 +212,7 @@ mod tests {
                 Method::new(
                     "t1_m".to_string(),
                     HTN::new(
-                        HashSet::from([1, 4]),
+                        BTreeSet::from([1, 4]),
                         vec![],
                         HashMap::from([
                             (1, Rc::clone(&p1)), (4, Rc::clone(&t4))
@@ -222,7 +222,7 @@ mod tests {
             ] 
         }));
         let init_tn = HTN::new(
-            HashSet::from([1,2,3]),
+            BTreeSet::from([1,2,3]),
             vec![(1, 3), (2, 3)],
             HashMap::from([
                 (1, Rc::clone(&t1)), (2, Rc::clone(&t2)), (3, Rc::clone(&t3))
@@ -266,7 +266,7 @@ mod tests {
             .filter(|x| x.get_name() == "t1").cloned().collect::<Vec<Rc<Task>>>()[0];
         let state = HashSet::from([to_classical.domain.facts.get_id("1")]);
         let tn = HTN::new(
-            HashSet::from([1]),
+            BTreeSet::from([1]),
             vec![],
             HashMap::from([(1, t1.clone())])
         );
@@ -296,7 +296,7 @@ mod tests {
             .filter(|x| x.get_name() == "P2").cloned().collect::<Vec<Rc<Task>>>()[0];
         let state = HashSet::from([to_classical.domain.facts.get_id("1")]);
         let tn = HTN::new(
-            HashSet::from([1, 2]),
+            BTreeSet::from([1, 2]),
             vec![],
             HashMap::from([(1, t1.clone()), (2, p2.clone())])
         );

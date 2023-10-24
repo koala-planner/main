@@ -9,6 +9,8 @@ use super::{AOStarSearch, FONDProblem};
 #[cfg(test)]
 #[test]
 pub fn failure_test() {
+    use std::collections::BTreeSet;
+
     use crate::domain_description::{Facts, DomainTasks};
 
     let p3 = Rc::new(Task::Primitive(PrimitiveAction::new(
@@ -21,7 +23,7 @@ pub fn failure_test() {
     let t1_method = Method::new(
         "m1".to_string(), 
         HTN::new(
-            HashSet::from([3]),
+            BTreeSet::from([3]),
             vec![],
             HashMap::from([(3, p3.clone())])
         )
@@ -45,7 +47,7 @@ pub fn failure_test() {
         vec![HashSet::new(),] 
     )));
     let init_tn = HTN::new(
-        HashSet::from([1,2,3]),
+        BTreeSet::from([1,2,3]),
         vec![(1,2),(2,3)],
         HashMap::from([
             (1, t1.clone()), (2, p1.clone()), (3,p2.clone())

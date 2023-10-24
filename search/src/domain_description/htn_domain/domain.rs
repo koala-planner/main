@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::collections::HashMap;
 use std::collections::HashSet;
 
@@ -66,7 +67,7 @@ impl FONDProblem {
                     .map(|(x, y)| (&subtasks[x as usize], &subtasks[y as usize]))
                     .map(|(x, y)| (domain_tasks.get_id(x), domain_tasks.get_id(y)))
                     .collect();
-            let subtasks: HashSet<u32> = subtasks.into_iter()
+            let subtasks: BTreeSet<u32> = subtasks.into_iter()
                     .map(|x| domain_tasks.get_id(&x))
                     .collect();
             let mappings: HashMap<u32, Rc<Task>> = subtasks.iter()
@@ -82,7 +83,7 @@ impl FONDProblem {
         // initial abstract task
         let initial_task_id = domain_tasks.get_id(&first_task);
         let tn = HTN::new(
-            HashSet::from([initial_task_id]),
+            BTreeSet::from([initial_task_id]),
             vec![],
             HashMap::from([
                 (initial_task_id, domain_tasks.get_task(initial_task_id))

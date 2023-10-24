@@ -106,6 +106,8 @@ impl TDG {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeSet;
+
     use super::*;
     use crate::task_network::Method;
     #[test]
@@ -143,7 +145,7 @@ mod tests {
             methods: vec![
                 Method::new(
                     "t4_m".to_string(),
-                    HTN::new(HashSet::from([2, 3]), vec![], HashMap::from([
+                    HTN::new(BTreeSet::from([2, 3]), vec![], HashMap::from([
                         (2, Rc::clone(&p2)), (3, Rc::clone(&p3))
                     ]))
                 )
@@ -155,7 +157,7 @@ mod tests {
                 Method::new(
                     "t3_m".to_string(),
                     HTN::new(
-                        HashSet::from([1, 2]),
+                        BTreeSet::from([1, 2]),
                         vec![(1,2)],
                         HashMap::from([
                             (1, Rc::clone(&p2)), (2, Rc::clone(&p2))
@@ -170,7 +172,7 @@ mod tests {
                 Method::new(
                     "t2_m".to_string(),
                     HTN::new(
-                        HashSet::from([4, 3]),
+                        BTreeSet::from([4, 3]),
                         vec![(4,3)],
                         HashMap::from([
                             (4, Rc::clone(&p4)), (3, Rc::clone(&p3))
@@ -185,7 +187,7 @@ mod tests {
                 Method::new(
                     "t1_m".to_string(),
                     HTN::new(
-                        HashSet::from([1, 4]),
+                        BTreeSet::from([1, 4]),
                         vec![],
                         HashMap::from([
                             (1, Rc::clone(&p1)), (4, Rc::clone(&t4))
@@ -195,7 +197,7 @@ mod tests {
             ] 
         }));
         let init_tn = HTN::new(
-            HashSet::from([1,2,3]),
+            BTreeSet::from([1,2,3]),
             vec![(1, 3), (2, 3)],
             HashMap::from([
                 (1, Rc::clone(&t1)), (2, Rc::clone(&t2)), (3, Rc::clone(&t3))
@@ -214,7 +216,7 @@ mod tests {
             methods: vec![
                 Method::new(
                     "m_unreach".to_string(),
-                    HTN::new(HashSet::from([2]), vec![], HashMap::from([
+                    HTN::new(BTreeSet::from([2]), vec![], HashMap::from([
                         (2, Rc::clone(&unreachable_p)),
                     ]))
                 )
@@ -227,7 +229,7 @@ mod tests {
         assert_eq!(tdg.all_reachables(Rc::clone(&p1)).len(), 1);
 
         let new_tn = HTN::new(
-            HashSet::from([1]),
+            BTreeSet::from([1]),
             vec![],
             HashMap::from([
                 (1, Rc::clone(&t1))
@@ -273,7 +275,7 @@ mod tests {
             methods: vec![
                 Method::new(
                     "t4_m".to_string(),
-                    HTN::new(HashSet::from([2, 3]), vec![], HashMap::from([
+                    HTN::new(BTreeSet::from([2, 3]), vec![], HashMap::from([
                         (2, Rc::clone(&p2)), (3, Rc::clone(&p3))
                     ]))
                 )
@@ -285,7 +287,7 @@ mod tests {
                 Method::new(
                     "t1_m".to_string(),
                     HTN::new(
-                        HashSet::from([1, 4]),
+                        BTreeSet::from([1, 4]),
                         vec![],
                         HashMap::from([
                             (1, Rc::clone(&p1)), (4, Rc::clone(&t4))
@@ -295,7 +297,7 @@ mod tests {
             ] 
         }));
         let tn = HTN::new(
-            HashSet::from([1,2,3]),
+            BTreeSet::from([1,2,3]),
             vec![(1,3), (2,3)],
             HashMap::from([(1, p1), (2,p2), (3,t1)])
         );
