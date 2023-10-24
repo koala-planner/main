@@ -25,18 +25,17 @@ impl FMPolicy {
                 Some(connection) => {
                     let marked = connection.has_marked_connection().unwrap();
                     // Check whether transition is decomposition or primitive action execution
-                    match marked.action_type {
-                        ConnectionLabel::Decomposition => {
+                    match &marked.action_type {
+                        ConnectionLabel::Decomposition(_) => {
                             for child in marked.children.iter(){
                                 working_set.push_back((*child, Rc::clone(&history)));
                             }
                         },
-                        ConnectionLabel::Execution(t) => {
-                            let task_name = node.search_node.tn.get_task(t).unwrap().get_name();
+                        ConnectionLabel::Execution(name, cost) => {
                             let state = node.search_node.state.as_ref().clone();
-                            policy.push((state, history.clone(), task_name.clone()));
+                            policy.push((state, history.clone(), name.clone()));
                             let mut new_history = history.as_ref().clone();
-                            new_history.push(task_name);
+                            new_history.push(name.clone());
                             let new_history = Rc::new(new_history);
                             for child in marked.children.iter() {
                                 working_set.push_back((*child, Rc::clone(&new_history)));

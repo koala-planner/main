@@ -13,14 +13,15 @@ impl ToDOT {
         let mut vertices = String::new();
         let mut edges = String::new();
         for (i, val) in tree.ids.iter() {
-            let color = ToDOT::node_color(&val.borrow().label);
+            let color = ToDOT::node_color(&val.borrow().status);
             vertices += &format!("\t{} [label={}, color={:?}]\n", i, i, color);
             match val.borrow().connections.as_ref() {
                 Some(x) => {
                     let mut connectors = vec![];
                     for children in x.children.iter() {
                         connectors.push(
-                            (children.children.clone(), children.is_marked, children.cost));
+                            (children.children.clone(), children.is_marked, children.cost)
+                        );
                     }
                     let and_string = ToDOT::and_node_string(tree, *i, connectors);
                     edges += &and_string;
@@ -123,44 +124,49 @@ mod tests {
             parent_id: None,
             search_node: dummy_search_node.clone(),
             connections: Some(NodeConnections { children: vec![
-                HyperArc { children: HashSet::from([2]), cost: 1.0, is_marked: false, action_type: ConnectionLabel::Execution(1)},
-                HyperArc { children: HashSet::from([3, 4]), cost: 1.0, is_marked: true, action_type: ConnectionLabel::Execution(2)},
-                HyperArc { children: HashSet::from([5]), cost: 0.0, is_marked: false, action_type: ConnectionLabel::Decomposition},
+                HyperArc { children: HashSet::from([2]), cost: 1.0, is_marked: false,
+                    action_type: ConnectionLabel::Execution("p1".to_string(), 1)},
+                HyperArc { children: HashSet::from([3, 4]), cost: 1.0, is_marked: true,
+                    action_type: ConnectionLabel::Execution("p2".to_string(), 2)},
+                HyperArc { children: HashSet::from([5]), cost: 0.0, is_marked: false,
+                    action_type: ConnectionLabel::Decomposition("m1".to_string())},
             ]}),
             cost: 2.0,
-            label: NodeStatus::OnGoing
+            status: NodeStatus::OnGoing
         };
         let n2 = ComputeTreeNode {
             parent_id: Some(1),
             search_node: dummy_search_node.clone(),
             connections: None,
             cost: f32::INFINITY,
-            label: NodeStatus::Failed
+            status: NodeStatus::Failed
         };
         let n3 = ComputeTreeNode {
             parent_id: Some(1),
             search_node: dummy_search_node.clone(),
             connections: Some(NodeConnections { children: vec![
-                HyperArc { children: HashSet::from([6]), cost: 1.0, is_marked: true, action_type: ConnectionLabel::Decomposition}
+                HyperArc { children: HashSet::from([6]), cost: 1.0, is_marked: true,
+                    action_type: ConnectionLabel::Decomposition("m1".to_string())}
             ]}),
             cost: 2.0,
-            label: NodeStatus::OnGoing
+            status: NodeStatus::OnGoing
         };
         let n4 = ComputeTreeNode {
             parent_id: Some(1),
             search_node: dummy_search_node.clone(),
             connections: None,
             cost: 0.0,
-            label: NodeStatus::Solved
+            status: NodeStatus::Solved
         };
         let n5 = ComputeTreeNode {
             parent_id: Some(1),
             search_node: dummy_search_node.clone(),
             connections: Some(NodeConnections { children: vec![
-                HyperArc { children: HashSet::from([7, 8]), cost: 1.0, is_marked: false, action_type: ConnectionLabel::Execution(3)},
+                HyperArc { children: HashSet::from([7, 8]), cost: 1.0, is_marked: false,
+                    action_type: ConnectionLabel::Execution("p4".to_string(), 1)},
             ]}),
             cost: 3.0,
-            label: NodeStatus::OnGoing
+            status: NodeStatus::OnGoing
         };
         let n6 = ComputeTreeNode {
             parent_id: Some(3),
@@ -176,21 +182,21 @@ mod tests {
             ),
             connections: None,
             cost: 1.0,  
-            label: NodeStatus::OnGoing
+            status: NodeStatus::OnGoing
         };
         let n7 = ComputeTreeNode {
             parent_id: Some(5),
             search_node: dummy_search_node.clone(),
             connections: None,
             cost: 2.0,
-            label: NodeStatus::OnGoing
+            status: NodeStatus::OnGoing
         };
         let n8 = ComputeTreeNode {
             parent_id: Some(5),
             search_node: dummy_search_node.clone(),
             connections: None,
             cost: 1.0,
-            label: NodeStatus::OnGoing
+            status: NodeStatus::OnGoing
         };
         ComputeTree {
             ids: HashMap::from([

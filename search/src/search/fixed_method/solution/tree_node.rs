@@ -6,7 +6,7 @@ pub struct ComputeTreeNode {
     pub search_node: SearchNode,
     pub connections: Option<NodeConnections>,
     pub cost: f32,
-    pub label: NodeStatus,
+    pub status: NodeStatus,
 }
 
 #[derive(Debug, Clone)]
@@ -51,6 +51,6 @@ impl ComputeTreeNode {
     }
 
     pub fn is_terminal(&self) -> bool {
-        self.label.is_terminal()
+        self.status.is_terminal()
     }
 }

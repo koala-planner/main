@@ -2,7 +2,7 @@ use std::{collections::HashSet, rc::Rc, cell::RefCell};
 use crate::{task_network::Applicability, relaxation::ToClassical, heuristic_calculator::FF};
 
 use super::{HTN, PrimitiveAction, Task, CompoundTask};
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SearchNode{
     pub state: Rc<HashSet<u32>>,
     pub tn: Rc<HTN>,
@@ -14,9 +14,10 @@ impl SearchNode {
     }
     
     pub fn compute_heuristic_value(&self, encoder: &ToClassical) -> f32 {
-        let relaxed_state = encoder.compute_relaxed_state(&self.tn, self.state.as_ref());
-        let goal_state = encoder.compute_goal_state(&self.tn);
-        FF::calculate_h(&encoder.domain, &relaxed_state, &goal_state)
+        // let relaxed_state = encoder.compute_relaxed_state(&self.tn, self.state.as_ref());
+        // let goal_state = encoder.compute_goal_state(&self.tn);
+        // FF::calculate_h(&encoder.domain, &relaxed_state, &goal_state)
+        0.0
     }
 
     pub fn is_goal(&self) -> bool {
@@ -56,8 +57,8 @@ impl SearchNode {
                             Rc::new(new_tn)
                         );
                         expansion.push(NodeExpansion {
-                            connection_label: ConnectionLabel::Execution(*t),
-                            items: vec![new_search_node], connector: Connector::OR
+                            connection_label: ConnectionLabel::Execution(a.name.clone(), a.cost),
+                            items: vec![new_search_node],
                         });
                     } else {
                         let new_tn = Rc::new(self.tn.apply_action(*t));
@@ -71,9 +72,8 @@ impl SearchNode {
                             new_search_nodes.push(new_search_node);
                         }
                         expansion.push(NodeExpansion {
-                            connection_label: ConnectionLabel::Execution(*t),
+                            connection_label: ConnectionLabel::Execution(a.name.clone(), a.cost),
                             items: new_search_nodes,
-                            connector: Connector::AND
                         });
                     }
                 }
@@ -92,41 +92,34 @@ impl SearchNode {
                     Rc::new(new_tn),
                 );
                 let expansion = NodeExpansion {
-                    connection_label: ConnectionLabel::Decomposition,
+                    connection_label: ConnectionLabel::Decomposition(t.name.clone()),
                     items: vec![new_search_node],
-                    connector: Connector::OR
                 };
                 expansions.push(expansion);
             }
             return expansions
         }   
         unreachable!()     
-    } 
+    }
 }
 
-#[derive(Debug)]
-pub enum Connector {
-    AND,
-    OR
-}
 
 #[derive(Debug)]
 pub struct NodeExpansion {
     pub connection_label: ConnectionLabel,
     pub items: Vec<SearchNode>,
-    pub connector: Connector
 }
 
 #[derive(Debug)]
 pub enum ConnectionLabel {
-    Execution(u32), 
-    Decomposition
+    Execution(String, u32), 
+    Decomposition(String)
 }
 
 impl ConnectionLabel {
     pub fn is_decomposition(&self) -> bool {
         match  &self {
-            ConnectionLabel::Decomposition => true,
+            ConnectionLabel::Decomposition(_) => true,
             _ => false
         }
     }
@@ -195,23 +188,19 @@ mod tests {
         let expansion = sn.expand();
         assert_eq!(expansion.len(), 4);
         let exp_p1: Vec<&NodeExpansion> = expansion.iter().filter(|x| {
-            match x.connection_label {
-                ConnectionLabel::Execution(1) => true,
+            match &x.connection_label {
+                ConnectionLabel::Execution(x, 1) if x == "p1" => true,
                 _ => false
             }
         }).collect();
         assert_eq!(exp_p1.len(), 1);
-        match exp_p1[0].connector {
-            Connector::AND => {}
-            _ => panic!()
-        };
         assert_eq!(exp_p1[0].items.len(), 2);
         for node in exp_p1[0].items.iter() {
             assert_eq!(node.tn.count_tasks(), 3);
         }
         let exp_t1: Vec<&NodeExpansion> = expansion.iter().filter(|x| {
             match x.connection_label {
-                ConnectionLabel::Decomposition => true,
+                ConnectionLabel::Decomposition(_) => true,
                 _ => false
             }
         }).collect();

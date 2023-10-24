@@ -57,20 +57,20 @@ mod test {
             children: HashSet::from([1,2,3]),
             cost: 0.0,
             is_marked: false,
-            action_type: ConnectionLabel::Decomposition
+            action_type: ConnectionLabel::Decomposition("m1".to_string())
             
         };
         let arc2 = HyperArc {
             children: HashSet::from([5,4]),
             cost: 0.0,
             is_marked: true,
-            action_type: ConnectionLabel::Decomposition
+            action_type: ConnectionLabel::Decomposition("m2".to_string())
         };
         let arc3 = HyperArc {
             children: HashSet::from([7,54]),
             cost: 0.0,
             is_marked: false,
-            action_type: ConnectionLabel::Execution(1)
+            action_type: ConnectionLabel::Execution("p1".to_string(), 1)
         };
         let mut connections = NodeConnections {
             children: vec![arc1, arc2, arc3]
