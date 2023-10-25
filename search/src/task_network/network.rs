@@ -79,33 +79,30 @@ impl HTN {
         let mut subgraph_edges = method.decomposition.network.edges.clone();
         let mut subgraph_mappings = method.decomposition.mappings.clone();
         // Changing IDs
-        let intersection: BTreeSet<u32> =
-            method.decomposition.mappings.keys().cloned().collect();
-        let network_max_id = self.network.nodes.iter().fold(u32::MIN, |a, b| a.max(*b));
-        let max_id = subgraph_nodes.iter().fold(network_max_id, |a, b| a.max(*b));
-        let new_ids: HashMap<u32, u32> = intersection.into_iter().zip(max_id + 1..).collect();
+        let network_max_id = self.network.nodes.iter().max().unwrap();
+        let subgraph_max_id = subgraph_nodes.iter().max().unwrap();
+        let max_id = *network_max_id.max(subgraph_max_id) + 1;
+        let new_ids: Vec<(u32, u32)> = subgraph_nodes.iter().cloned().zip(max_id..).collect();
         for (prev_id, new_id) in new_ids.iter() {
             let mapping_val = subgraph_mappings.remove(&prev_id).unwrap();
             subgraph_mappings.insert(*new_id, mapping_val);
             if subgraph_edges.contains_key(&prev_id) {
-                let edges: BTreeSet<u32> = subgraph_edges.remove(&prev_id).unwrap();
-                let mapped_edges = edges.into_iter().map(|x| {
-                    if new_ids.contains_key(&x) {
-                        *new_ids.get(&x).unwrap()
-                    } else {
-                        x
+                let mut edges: BTreeSet<u32> = subgraph_edges.remove(&prev_id).unwrap();
+                for (i, j) in new_ids.iter() {
+                    if edges.contains(&i){
+                        edges.remove(i);
+                        edges.insert(*j);
                     }
-                });
-                subgraph_edges.insert(*new_id, mapped_edges.collect());
+                }
+                subgraph_edges.insert(*new_id, edges);
             }
-            subgraph_nodes.remove(&prev_id);
+            subgraph_nodes.remove(prev_id);
             subgraph_nodes.insert(*new_id);
         }
         // Creating Graph
         let mut new_graph = self.network.clone();
         let outgoing_edges = self.network.get_outgoing_edges(id);
         let incoming_edges = self.network.get_incoming_edges(id);
-
         new_graph = new_graph.remove_node(id);
         new_graph = new_graph.add_subgraph(
             Graph::new(
@@ -115,7 +112,6 @@ impl HTN {
             incoming_edges,
             outgoing_edges,
         );
-
         let mut new_mappings = self.mappings.clone();
         new_mappings.remove(&id);
         for (id, m) in subgraph_mappings {
@@ -536,14 +532,15 @@ mod tests {
         let t = Task::Compound(CompoundTask { name: "recursive".to_owned(), methods: vec![] });
         let mut tasks = DomainTasks::new(vec![t.clone()]);
         let r = Rc::new(t);
-        let method = Method::new(
-            "m1".to_owned(), HTN::new(
-            BTreeSet::from([1, 2]),
-            vec![],
-            HashMap::from([(1, r.clone()), (2, r.clone())])
-            )
+        tasks.add_method(
+            0,
+            Method::new(
+                "m1".to_owned(), HTN::new(
+                BTreeSet::from([1, 2]),
+                vec![],
+                HashMap::from([(1, r.clone()), (2, r.clone())])
+                ))
         );
-        tasks.add_method(0, method);
         let new_task = tasks.get_task(0);
         let tn = HTN::new(
             BTreeSet::from([1]),
@@ -552,6 +549,7 @@ mod tests {
         );
         if let Task::Compound(CompoundTask { name: _, methods }) = new_task.as_ref() {
             assert_eq!(methods.len(), 1);
+            println!("{:?}", methods);
             let new_tn = tn.decompose(1, &methods[0]);
             assert_eq!(new_tn.count_tasks(), 2);
             for t in new_tn.get_all_tasks() {

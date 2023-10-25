@@ -111,7 +111,10 @@ impl Graph {
         incoming_edges: BTreeSet<u32>,
         outgoing_edges: BTreeSet<u32>,
     ) -> Graph {
-        let nodes = self.nodes.clone().union(&subgraph.nodes).cloned().collect();
+        let nodes: BTreeSet<u32> = self.nodes.clone().union(&subgraph.nodes).cloned().collect();
+        if !self.nodes.intersection(&subgraph.nodes).collect::<BTreeSet<&u32>>().is_empty() {
+            panic!("The IDs of subgraph and current graph are not disjoint")
+        }
         let mut orderings = self.edges.clone();
 
         // Adding incoming edges
