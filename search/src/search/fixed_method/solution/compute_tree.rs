@@ -1,6 +1,6 @@
 use crate::domain_description::ClassicalDomain;
 use crate::relaxation::{DeleteRelaxation, OutcomeDeterminizer};
-use std::collections::{HashMap, HashSet, LinkedList};
+use std::collections::{HashMap, HashSet, LinkedList, BTreeSet};
 use std::vec;
 
 use super::fm_policy::FMPolicy;
@@ -53,7 +53,7 @@ impl ComputeTree {
         }
     }
 
-    pub fn get_max_cost_node(&self, nodes: &Vec<u32>) -> u32 {
+    pub fn get_max_cost_node(&self, nodes: &BTreeSet<u32>) -> u32 {
         let (mut argmax, mut max_cost) = (u32::MAX, f32::INFINITY);
         for id in nodes.iter() {
             let cost = self.ids.get(id).unwrap().borrow().cost;
@@ -77,11 +77,11 @@ impl ComputeTree {
         }
     }
 
-    pub fn get_tip_nodes(&self) -> Vec<u32> {
-        let mut working_set = vec![self.root];
-        let mut tip_node_ids = vec![];
+    pub fn get_tip_nodes(&self) -> BTreeSet<u32> {
+        let mut working_set = BTreeSet::from([self.root]);
+        let mut tip_node_ids = BTreeSet::new();
         while !working_set.is_empty() {
-            let mut marked = vec![];
+            let mut marked = BTreeSet::new();
             // Follow Markers
             for x in working_set.iter() {
                 let mut marker_update = None;
@@ -106,7 +106,7 @@ impl ComputeTree {
                         }
                         None => match node.status {
                             NodeStatus::OnGoing => {
-                                tip_node_ids.push(*x);
+                                tip_node_ids.insert(*x);
                             }
                             _ => {}
                         },

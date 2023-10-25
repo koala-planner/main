@@ -1,3 +1,4 @@
+use core::fmt;
 use std::{rc::Rc, collections::{HashMap, HashSet, LinkedList}, vec};
 
 use super::{Task, CompoundTask, PrimitiveAction, HTN};
@@ -11,7 +12,6 @@ pub struct TDG {
 
 impl TDG {
     pub fn new(tn: &HTN) -> TDG {
-        let tn = tn.collapse_tn();
         let root = *tn.get_unconstrained_tasks()
                             .iter()
                             .next()
@@ -29,7 +29,7 @@ impl TDG {
                         None => {
                             let mut task_connections = vec![];
                             for method in compound.methods.iter() {
-                                let name = task.get_name() + " " + &method.name;
+                                let name = method.name.clone();
                                 let subtasks = method.decomposition.get_all_tasks();
                                 method_vertices.insert(name.clone(),subtasks.clone());
                                 for elem in subtasks.iter() {
@@ -101,6 +101,44 @@ impl TDG {
             reachables.extend(self.all_reachables(task.clone()));
         }
         reachables
+    }
+}
+
+impl fmt::Display for TDG {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        write!(f, "digraph G {{\n");
+        writeln!(f, "\tsubgraph clustertask {{\n\tlabel=\"tasks\"");
+        for (task, _) in self.task_vertices.iter() {
+            write!(f, "\t\t{}[shape=box]\n", task.get_name().replace("[", "_").replace("]", "").replace(",", "__"));
+        }
+        writeln!(f, "\t}}");
+        for (task, connections) in self.task_vertices.iter() {
+            match connections {
+                Some(x) => {
+                    for c in x.iter() {
+                        write!(f, "\t{} -> {}\n",
+                        task.get_name().replace("[", "_").replace("]", "").replace(",", "__"),
+                        c.replace("[", "_").replace("]", "").replace(",", "__"));
+                    }
+                },
+                None => {
+                    write!(f, "\t{}\n", task.get_name().replace("[", "_").replace("]", "").replace(",", "__"));
+                }
+            }
+        }
+
+        writeln!(f, "\tsubgraph clustermethod {{\n\tlabel=\"methods\"");
+        for (method, _) in self.method_vertices.iter() {
+            write!(f, "\t\t{}[shape=box]\n", method.replace("[", "_").replace("]", "").replace(",", "__"));
+        }
+        writeln!(f, "\t}}");
+        for (name, connections) in self.method_vertices.iter() {
+            for x in connections.iter() {
+                write!(f, "\t{} -> {}\n", name.replace("[", "_").replace("]", "").replace(",", "__"),
+                x.get_name().replace("[", "_").replace("]", "").replace(",", "__"));
+            }
+        }
+        write!(f, "}}")
     }
 }
 
@@ -300,11 +338,11 @@ mod tests {
             BTreeSet::from([1,2,3]),
             vec![(1,3), (2,3)],
             HashMap::from([(1, p1), (2,p2), (3,t1)])
-        );
+        ).collapse_tn();
         
         let tdg = TDG::new(&tn);
         let new_tn = tn.apply_action(1);
         let result = tdg.reachable_from_tn(&new_tn);
-        assert_eq!(result.len(), 5);
+        assert_eq!(result.len(), 6);
     }
 }

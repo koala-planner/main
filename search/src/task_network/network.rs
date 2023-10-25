@@ -66,35 +66,42 @@ impl HTN {
     }
 
     pub fn decompose(&self, id: u32, method: &Method) -> HTN {
+        match self.mappings.get(&id) {
+            Some(x) => {
+                if let Task::Primitive(_) = x.as_ref() { panic!("task is not primitive") };
+            },
+            None => {
+                panic!("task does not exist")
+            }
+        }
         // TODO: Refactor this function
         let mut subgraph_nodes = method.decomposition.network.nodes.clone();
         let mut subgraph_edges = method.decomposition.network.edges.clone();
         let mut subgraph_mappings = method.decomposition.mappings.clone();
-        if !subgraph_nodes.is_disjoint(&self.network.nodes) {
-            let intersection: BTreeSet<u32> =
-                method.decomposition.mappings.keys().cloned().collect();
-            let network_max_id = self.network.nodes.iter().fold(u32::MIN, |a, b| a.max(*b));
-            let max_id = subgraph_nodes.iter().fold(network_max_id, |a, b| a.max(*b));
-            let new_ids: HashMap<u32, u32> = intersection.into_iter().zip(max_id + 1..).collect();
-            for (prev_id, new_id) in new_ids.iter() {
-                let mapping_val = subgraph_mappings.remove(&prev_id).unwrap();
-                subgraph_mappings.insert(*new_id, mapping_val);
-                if subgraph_edges.contains_key(&prev_id) {
-                    let edges: BTreeSet<u32> = subgraph_edges.remove(&prev_id).unwrap();
-                    let mapped_edges = edges.into_iter().map(|x| {
-                        if new_ids.contains_key(&x) {
-                            *new_ids.get(&x).unwrap()
-                        } else {
-                            x
-                        }
-                    });
-
-                    subgraph_edges.insert(*new_id, mapped_edges.collect());
-                }
-                subgraph_nodes.remove(&prev_id);
-                subgraph_nodes.insert(*new_id);
+        // Changing IDs
+        let intersection: BTreeSet<u32> =
+            method.decomposition.mappings.keys().cloned().collect();
+        let network_max_id = self.network.nodes.iter().fold(u32::MIN, |a, b| a.max(*b));
+        let max_id = subgraph_nodes.iter().fold(network_max_id, |a, b| a.max(*b));
+        let new_ids: HashMap<u32, u32> = intersection.into_iter().zip(max_id + 1..).collect();
+        for (prev_id, new_id) in new_ids.iter() {
+            let mapping_val = subgraph_mappings.remove(&prev_id).unwrap();
+            subgraph_mappings.insert(*new_id, mapping_val);
+            if subgraph_edges.contains_key(&prev_id) {
+                let edges: BTreeSet<u32> = subgraph_edges.remove(&prev_id).unwrap();
+                let mapped_edges = edges.into_iter().map(|x| {
+                    if new_ids.contains_key(&x) {
+                        *new_ids.get(&x).unwrap()
+                    } else {
+                        x
+                    }
+                });
+                subgraph_edges.insert(*new_id, mapped_edges.collect());
             }
+            subgraph_nodes.remove(&prev_id);
+            subgraph_nodes.insert(*new_id);
         }
+        // Creating Graph
         let mut new_graph = self.network.clone();
         let outgoing_edges = self.network.get_outgoing_edges(id);
         let incoming_edges = self.network.get_incoming_edges(id);
@@ -252,6 +259,8 @@ impl fmt::Display for HTN {
 
 #[cfg(test)]
 mod tests {
+    use crate::domain_description::DomainTasks;
+
     use super::*;
 
     fn create_initial_tasks() -> (Rc<Task>, Rc<Task>, Rc<Task>, Rc<Task>) {
@@ -520,5 +529,39 @@ mod tests {
         let new_tn = network.collapse_tn();
         assert_eq!(new_tn.count_tasks(), 1);
         assert_eq!(new_tn.get_unconstrained_tasks(), BTreeSet::from([5]));
-    } 
+    }
+
+    #[test]
+    pub fn recursive_decompoition_test() {
+        let t = Task::Compound(CompoundTask { name: "recursive".to_owned(), methods: vec![] });
+        let mut tasks = DomainTasks::new(vec![t.clone()]);
+        let r = Rc::new(t);
+        let method = Method::new(
+            "m1".to_owned(), HTN::new(
+            BTreeSet::from([1, 2]),
+            vec![],
+            HashMap::from([(1, r.clone()), (2, r.clone())])
+            )
+        );
+        tasks.add_method(0, method);
+        let new_task = tasks.get_task(0);
+        let tn = HTN::new(
+            BTreeSet::from([1]),
+            vec![],
+            HashMap::from([(1,new_task.clone())])
+        );
+        if let Task::Compound(CompoundTask { name: _, methods }) = new_task.as_ref() {
+            assert_eq!(methods.len(), 1);
+            let new_tn = tn.decompose(1, &methods[0]);
+            assert_eq!(new_tn.count_tasks(), 2);
+            for t in new_tn.get_all_tasks() {
+                if let Task::Compound(CompoundTask { name, methods }) = t.as_ref(){
+                    assert_eq!(name, "recursive");
+                    assert_eq!(methods.len(), 1);
+                }
+            }
+            println!("{:?}", new_tn.mappings);
+        }
+
+    }
 }

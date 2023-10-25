@@ -60,10 +60,10 @@ impl fmt::Display for Task {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
             Task::Compound(x) => {
-                writeln!(f, "(C) {}", x.name)
+                writeln!(f, "COMPOUND_{}", x.name)
             },
             Task::Primitive(x) => {
-                writeln!(f, "(P) {}", x.name)
+                writeln!(f, "PRIMITIVE_{}", x.name)
             }
         }
     }
