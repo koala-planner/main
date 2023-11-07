@@ -141,12 +141,12 @@ impl ComputeTree  {
         // compute successors
         let node_successors = self.ids.get(&id).unwrap().borrow().search_node.expand();
         // Case where node is terminal, terminate expansion
-        if (*node_successors).len() == 0 {
+        if node_successors.len() == 0 {
             self.mark_as_terminal(id);
             return;
         }
         // Process node expansion to the desired format
-        let expansions: Vec<(Vec<ComputeTreeNode>, ConnectionLabel)> = (*node_successors)
+        let expansions: Vec<(Vec<ComputeTreeNode>, ConnectionLabel)> = node_successors
             .into_iter()
             .map(|x| {
                 (

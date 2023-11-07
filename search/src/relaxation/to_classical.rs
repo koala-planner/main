@@ -31,7 +31,6 @@ impl ToClassical  {
         let new_actions = ToClassical::encode(&domain, &new_facts);
         let classic_domain = ClassicalDomain { facts: new_facts, actions: new_actions };
         let tdg = TDG::new(&domain.init_tn);
-        println!("{}", tdg);
         ToClassical { domain: classic_domain, original_tasks: domain.tasks.clone(), tdg: tdg }
     }
 

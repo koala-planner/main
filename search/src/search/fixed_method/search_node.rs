@@ -23,9 +23,9 @@ impl SearchNode {
         self.tn.is_empty()
     }
 
-    pub fn expand(&self) -> Box<Vec<NodeExpansion>> {
+    pub fn expand(&self) -> Vec<NodeExpansion> {
         if self.is_goal() {
-            return Box::new(vec![]);
+            return vec![];
         }
         let tn = &self.tn;
         let unconstrained = tn.get_unconstrained_tasks();
@@ -37,10 +37,10 @@ impl SearchNode {
             let abstract_expansions = self.expand_abstract_task(*abstract_id);
             expansions.extend(*abstract_expansions);
         }
-        Box::new(*expansions)
+        expansions
     }
 
-    fn expand_primitives(&self, primitive_tasks: BTreeSet<u32>) -> Box<Vec<NodeExpansion>> {
+    fn expand_primitives(&self, primitive_tasks: BTreeSet<u32>) -> Vec<NodeExpansion> {
         let mut expansion = vec![];
         for t in primitive_tasks.iter() {
             if let Task::Primitive(a) = &*self.tn.get_task(*t).borrow() {
@@ -75,7 +75,7 @@ impl SearchNode {
                 }
             };
         }
-        Box::new(expansion)
+        expansion
     } 
 
     fn expand_abstract_task(&self, task_id: u32) -> Box<Vec<NodeExpansion>> {
