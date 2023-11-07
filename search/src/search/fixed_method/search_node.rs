@@ -1,6 +1,6 @@
 use std::{collections::{HashSet, BTreeSet}, rc::Rc, cell::RefCell};
-use crate::{task_network::Applicability, relaxation::ToClassical, heuristic_calculator::FF};
-
+use crate::{task_network::Applicability, relaxation::ToClassical};
+use crate::heuristic_calculator::FF;
 use super::{HTN, PrimitiveAction, Task, CompoundTask};
 #[derive(Debug, Clone)]
 pub struct SearchNode{
@@ -23,9 +23,9 @@ impl SearchNode {
         self.tn.is_empty()
     }
 
-    pub fn expand(&self) -> Vec<NodeExpansion> {
+    pub fn expand(&self) -> Box<Vec<NodeExpansion>> {
         if self.is_goal() {
-            return vec![];
+            return Box::new(vec![]);
         }
         let tn = &self.tn;
         let unconstrained = tn.get_unconstrained_tasks();
@@ -35,18 +35,15 @@ impl SearchNode {
         // expand all abstract tasks
         for abstract_id in abstract_tasks.iter() {
             let abstract_expansions = self.expand_abstract_task(*abstract_id);
-            expansions.extend(abstract_expansions);
+            expansions.extend(*abstract_expansions);
         }
-        expansions
+        Box::new(*expansions)
     }
 
-    fn expand_primitives(
-        &self,
-        primitive_tasks: BTreeSet<u32>
-    )-> Vec<NodeExpansion> {
+    fn expand_primitives(&self, primitive_tasks: BTreeSet<u32>) -> Box<Vec<NodeExpansion>> {
         let mut expansion = vec![];
         for t in primitive_tasks.iter() {
-            if let Task::Primitive(a) = self.tn.get_task(*t).unwrap().as_ref() {
+            if let Task::Primitive(a) = &*self.tn.get_task(*t).borrow() {
                 if a.is_applicable(&self.state) {
                     if a.is_deterministic() {
                         let new_tn = self.tn.apply_action(*t);
@@ -76,13 +73,13 @@ impl SearchNode {
                         });
                     }
                 }
-            }
+            };
         }
-        expansion
+        Box::new(expansion)
     } 
 
-    fn expand_abstract_task(&self, task_id: u32) -> Vec<NodeExpansion> {
-        if let Task::Compound(t) = self.tn.get_task(task_id).unwrap().as_ref() {
+    fn expand_abstract_task(&self, task_id: u32) -> Box<Vec<NodeExpansion>> {
+        if let Task::Compound(t) = &*self.tn.get_task(task_id).borrow() {
             let mut expansions = vec![];
             for method in t.methods.iter() {
                 let new_tn = self.tn.decompose(task_id, method);
@@ -90,13 +87,13 @@ impl SearchNode {
                     Rc::clone(&self.state),
                     Rc::new(new_tn),
                 );
-                let expansion = NodeExpansion {
-                    connection_label: ConnectionLabel::Decomposition(method.name.clone()),
-                    items: vec![new_search_node],
-                };
-                expansions.push(expansion);
+                expansions.push(
+                    NodeExpansion {
+                        connection_label: ConnectionLabel::Decomposition(method.name.clone()),
+                        items: vec![new_search_node]
+                    });
             }
-            return expansions
+            return Box::new(expansions)
         }   
         unreachable!()     
     }
@@ -155,60 +152,68 @@ impl PartialEq for ConnectionLabel {
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
-    use crate::task_network::Method;
+    use crate::{task_network::Method, domain_description::DomainTasks};
     use super::*;
 
     #[test]
     pub fn expansion_correctness_test() {
-        let p1 = Rc::new(Task::Primitive(PrimitiveAction::new(
+        let p1 = Task::Primitive(PrimitiveAction::new(
             "p1".to_string(), 
             1, 
             HashSet::from([0]), 
             vec![HashSet::from([1]), HashSet::from([2,4])],
             vec![HashSet::from([3]), HashSet::new()] 
-        )));
-        let p2 = Rc::new(Task::Primitive(PrimitiveAction::new(
+        ));
+        let p2 = Task::Primitive(PrimitiveAction::new(
             "p2".to_string(), 
             1, 
             HashSet::from([1, 2, 4]), 
             vec![HashSet::from([1]),],
             vec![HashSet::from([3]),] 
-        )));
-        let p3 = Rc::new(Task::Primitive(PrimitiveAction::new(
+        ));
+        let p3 = Task::Primitive(PrimitiveAction::new(
             "p3".to_string(), 
             1, 
             HashSet::from([0, 3]), 
             vec![HashSet::from([1]),],
             vec![HashSet::from([3]),] 
-        )));
-        let p4 = Rc::new(Task::Primitive(PrimitiveAction::new(
+        ));
+        let p4 = Task::Primitive(PrimitiveAction::new(
             "p4".to_string(), 
             1, 
             HashSet::from([4]), 
             vec![HashSet::from([2]),],
             vec![HashSet::new(),] 
-        )));
+        ));
+        let t1 = Task::Compound(CompoundTask::new(
+            "t1".to_string(),
+            vec![]
+        ));
+        let domain = Rc::new(DomainTasks::new(vec![p1, p2, p3, p4, t1]));
         let m1 = Method::new(
             "m1".to_string(),
             HTN::new(
-                BTreeSet::from([1,2]), vec![(1,2)], HashMap::from([(1, p1.clone()), (2, p2.clone())]))
+                BTreeSet::from([1,2]),
+                vec![(1,2)],
+                domain.clone(),
+                HashMap::from([(1, domain.get_id("p1")), (2, domain.get_id("p2"))]))
         );
         let m2 = Method::new(
             "m2".to_string(),
             HTN::new(
-                BTreeSet::from([1,2]), vec![], HashMap::from([(1, p3.clone()), (2, p4.clone())]))
+                BTreeSet::from([1,2]),
+                vec![], 
+                domain.clone(),
+                HashMap::from([(1, domain.get_id("p3")), (2, domain.get_id("p4"))]))
         );
-        let t1 = Rc::new(Task::Compound(CompoundTask::new(
-            "t1".to_string(),
-            vec![m1, m2]
-        )));
-
+        let id = domain.get_id("t1");
+        let domain = domain.add_methods(vec![(id, m1), (id, m2)]);
         let tn = HTN::new(
             BTreeSet::from([1, 2, 3, 4]), 
             vec![(1,4), (2,4), (3,4)],
-            HashMap::from([
-                (1, p1), (2, t1), (3, p3), (4, p4)
-            ])
+            domain.clone(),
+            HashMap::from([(1, domain.get_id("p1")), (2, domain.get_id("t1")),
+            (3, domain.get_id("p3")), (4, domain.get_id("p4"))])
         );
         let state = HashSet::from([0,3]);
         let sn = SearchNode::new(Rc::new(state), Rc::new(tn));

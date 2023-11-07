@@ -107,13 +107,12 @@ mod test {
         let mut prim_counter = 0;
         let mut method_counter = 0;
         for task in all_tasks.iter() {
-            if task.is_primitive() {
-                prim_counter += 1;
-            } else {
-                if let Task::Compound(CompoundTask {name: _, methods}) = task.as_ref() {
-                    method_counter += methods.len();
-                }
-            }
+            match &*task.borrow() {
+                Task::Compound(CompoundTask {name: _, methods}) => {
+                    method_counter += methods.len()
+                },
+                Task::Primitive(_) => {prim_counter += 1;}
+            };
         }
         assert_eq!(prim_counter, 46);
         assert_eq!(method_counter, 46);

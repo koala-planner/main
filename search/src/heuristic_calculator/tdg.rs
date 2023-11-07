@@ -1,49 +1,56 @@
 use core::fmt;
-use std::{rc::Rc, collections::{HashMap, HashSet, LinkedList}, vec};
+use std::{rc::Rc, collections::{HashMap, HashSet, LinkedList, BTreeSet}, vec};
 
+use crate::domain_description::DomainTasks;
+use std::cell::RefCell;
 use super::{Task, CompoundTask, PrimitiveAction, HTN};
 
 #[derive(Debug)]
-pub struct TDG {
-    root: Rc<Task>,
-    task_vertices: HashMap<Rc<Task>, Option<Vec<String>>>,
-    method_vertices: HashMap<String, Vec<Rc<Task>>>
+pub struct TDG{
+    domain: Rc<DomainTasks>,
+    root: u32,
+    task_vertices: HashMap<u32, Option<Vec<String>>>,
+    method_vertices: HashMap<String, Vec<u32>>
 }
 
-impl TDG {
+impl TDG  {
     pub fn new(tn: &HTN) -> TDG {
+        if tn.count_tasks() != 1 {
+            panic!("TN is not in collapsed format")
+        }
         let root = *tn.get_unconstrained_tasks()
                             .iter()
                             .next()
                             .unwrap();
-        let root = tn.get_task(root).unwrap();
+        let domain = tn.domain.clone();
+        let root = domain.get_id(&tn.get_task(root).borrow().get_name());
         let mut task_vertices = HashMap::new();
         let mut method_vertices = HashMap::new();
-        let mut working_set = LinkedList::from([Rc::clone(&root)]);
+        let mut working_set = LinkedList::from([root]);
         while !working_set.is_empty() {
-            let task = working_set.pop_front().unwrap();
-            match task.as_ref() {
+            let task_id = working_set.pop_front().unwrap();
+            match &*domain.get_task(task_id).borrow() {
                 Task::Compound(compound) => {
-                    match task_vertices.get(&task) {
+                    match task_vertices.get(&task_id) {
                         Some(_) => { },
                         None => {
                             let mut task_connections = vec![];
-                            for method in compound.methods.iter() {
-                                let name = method.name.clone();
+                            for (i, method) in compound.methods.iter().enumerate() {
+                                let name = format!("task{}_m{}", task_id, i);
                                 let subtasks = method.decomposition.get_all_tasks();
+                                let subtasks: Vec<u32> = subtasks.iter().map(|x| {
+                                    domain.get_id(&x.borrow().get_name())
+                                }).collect();
                                 method_vertices.insert(name.clone(),subtasks.clone());
                                 for elem in subtasks.iter() {
-                                    working_set.push_back(Rc::clone(elem));
-                                    if !task_vertices.contains_key(elem) && elem.as_ref().is_primitive() {
+                                    working_set.push_back(*elem);
+                                    if !task_vertices.contains_key(elem) && domain.get_task(*elem).borrow().is_primitive() {
                                         task_vertices.insert(elem.clone(), None);
                                     }
                                 }
                                 task_connections.push(name);
                             }
-                            task_vertices.insert(
-                                task,
-                                Some(task_connections)
-                            );
+                            task_vertices.insert(task_id, Some(task_connections));
                         }
                     }
                 },
@@ -52,7 +59,8 @@ impl TDG {
                 }
             }
         }
-        TDG {
+        TDG{
+            domain: domain,
             root: root,
             task_vertices: task_vertices,
             method_vertices: method_vertices
@@ -60,14 +68,16 @@ impl TDG {
     }
 
     // Checks whether "task" can be reached from the current network
-    pub fn is_reachable(&self, task: &Task) -> bool {
-        self.task_vertices.contains_key(task)
+    pub fn is_reachable(&self, task: &RefCell<Task>) -> bool {
+        let id = self.domain.get_id(&task.borrow().get_name());
+        self.task_vertices.contains_key(&id)
     }
 
     // compute all reachable tasks from "task"
-    pub fn all_reachables(&self, task: Rc<Task>) -> HashSet<Rc<Task>> {
-        let mut working_set = LinkedList::from([task.clone()]);
-        let mut result = HashSet::from([task]);
+    pub fn all_reachables(&self, task: &RefCell<Task>) -> BTreeSet<u32> {
+        let task_id = self.domain.get_id(&task.borrow().get_name());
+        let mut working_set = LinkedList::from([task_id]);
+        let mut result = BTreeSet::from([task_id]);
         while !working_set.is_empty() {
             let current = working_set.pop_front().unwrap();
             match self.task_vertices.get(&current) {
@@ -77,13 +87,13 @@ impl TDG {
                             for method in method_names.iter() {
                                 let new_tasks = self.method_vertices.get(method).unwrap();
                                 for new_task in new_tasks.iter() {
-                                    working_set.push_back(Rc::clone(new_task));
-                                    result.insert(Rc::clone(new_task));
+                                    working_set.push_back(*new_task);
+                                    result.insert(*new_task);
                                 }
                             }
                         },
                         None => {
-                            result.insert(Rc::clone(&current));
+                            result.insert(current);
                         }
                     }
                 },
@@ -94,35 +104,36 @@ impl TDG {
     }
 
     // compute all reachable tasks from an HTN
-    pub fn reachable_from_tn(&self, tn: &HTN) -> HashSet<Rc<Task>> {
-        let all_tasks = tn.get_all_tasks();
-        let mut reachables = HashSet::new();
-        for task in all_tasks.iter() {
-            reachables.extend(self.all_reachables(task.clone()));
+    pub fn reachable_from_tn<'a>(&'a self, tn: &'a HTN) -> BTreeSet<u32> {
+        let mut reachables = BTreeSet::new();
+        for task in tn.get_all_tasks().iter() {
+            reachables.extend(self.all_reachables(*task));
         }
         reachables
     }
 }
 
-impl fmt::Display for TDG {
+impl fmt::Display for TDG  {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         write!(f, "digraph G {{\n");
         writeln!(f, "\tsubgraph clustertask {{\n\tlabel=\"tasks\"");
         for (task, _) in self.task_vertices.iter() {
-            write!(f, "\t\t{}[shape=box]\n", task.get_name().replace("[", "_").replace("]", "").replace(",", "__"));
+            let task_name = self.domain.get_task(*task).borrow().get_name();
+            write!(f, "\t\t{}[shape=box]\n", task_name.replace("[", "_").replace("]", "").replace(",", "__"));
         }
         writeln!(f, "\t}}");
         for (task, connections) in self.task_vertices.iter() {
+            let task_name = self.domain.get_task(*task).borrow().get_name();
             match connections {
                 Some(x) => {
                     for c in x.iter() {
                         write!(f, "\t{} -> {}\n",
-                        task.get_name().replace("[", "_").replace("]", "").replace(",", "__"),
+                        task_name.replace("[", "_").replace("]", "").replace(",", "__"),
                         c.replace("[", "_").replace("]", "").replace(",", "__"));
                     }
                 },
                 None => {
-                    write!(f, "\t{}\n", task.get_name().replace("[", "_").replace("]", "").replace(",", "__"));
+                    write!(f, "\t{}\n", task_name.replace("[", "_").replace("]", "").replace(",", "__"));
                 }
             }
         }
@@ -134,8 +145,9 @@ impl fmt::Display for TDG {
         writeln!(f, "\t}}");
         for (name, connections) in self.method_vertices.iter() {
             for x in connections.iter() {
+                let task_name = self.domain.get_task(*x).borrow().get_name();
                 write!(f, "\t{} -> {}\n", name.replace("[", "_").replace("]", "").replace(",", "__"),
-                x.get_name().replace("[", "_").replace("]", "").replace(",", "__"));
+                task_name.replace("[", "_").replace("]", "").replace(",", "__"));
             }
         }
         write!(f, "}}")
@@ -147,202 +159,241 @@ mod tests {
     use std::collections::BTreeSet;
 
     use super::*;
-    use crate::task_network::Method;
+    use crate::{task_network::Method, domain_description::{FONDProblem, Facts}};
     #[test]
     pub fn tdg_correctnes_test() {
-        let p1 = Rc::new(Task::Primitive(PrimitiveAction::new(
-            "P1".to_string(),
+        let p1 = Task::Primitive(PrimitiveAction::new(
+            "p1".to_string(),
             1,
             HashSet::new(),
             vec![HashSet::from([1])], 
             vec![HashSet::new()]
-        )));
-        let p2 = Rc::new(Task::Primitive(PrimitiveAction::new(
-            "P2".to_string(),
+        ));
+        let p2 = Task::Primitive(PrimitiveAction::new(
+            "p2".to_string(),
             1,
             HashSet::from([2]),
             vec![HashSet::from([3])], 
             vec![HashSet::new()]
-        )));
-        let p3 = Rc::new(Task::Primitive(PrimitiveAction::new(
-            "P3".to_string(),
+        ));
+        let p3 = Task::Primitive(PrimitiveAction::new(
+            "p3".to_string(),
             1,
             HashSet::from([3]),
             vec![HashSet::from([2])], 
             vec![HashSet::new()]
-        )));
-        let p4 = Rc::new(Task::Primitive(PrimitiveAction::new(
-            "P4".to_string(),
+        ));
+        let p4 = Task::Primitive(PrimitiveAction::new(
+            "p4".to_string(),
             1,
             HashSet::from([1]),
             vec![HashSet::from([2]), HashSet::from([3])], 
             vec![HashSet::from([1]), HashSet::from([1])]
-        )));
-        let t4 = Rc::new(Task::Compound(CompoundTask{
+        ));
+        let t4 = Task::Compound(CompoundTask{
             name: "t4".to_string(),
-            methods: vec![
-                Method::new(
-                    "t4_m".to_string(),
-                    HTN::new(BTreeSet::from([2, 3]), vec![], HashMap::from([
-                        (2, Rc::clone(&p2)), (3, Rc::clone(&p3))
-                    ]))
-                )
-            ] 
-        }));
-        let t3 = Rc::new(Task::Compound(CompoundTask{
+            methods: vec![] 
+        });
+        let t3 = Task::Compound(CompoundTask{
             name: "t3".to_string(),
-            methods: vec![
-                Method::new(
-                    "t3_m".to_string(),
-                    HTN::new(
-                        BTreeSet::from([1, 2]),
-                        vec![(1,2)],
-                        HashMap::from([
-                            (1, Rc::clone(&p2)), (2, Rc::clone(&p2))
-                        ])
-                    )
-                )
-            ] 
-        }));
-        let t2 = Rc::new(Task::Compound(CompoundTask{
+            methods: vec![] 
+        });
+        let t2 = Task::Compound(CompoundTask{
             name: "t2".to_string(),
-            methods: vec![
-                Method::new(
-                    "t2_m".to_string(),
-                    HTN::new(
-                        BTreeSet::from([4, 3]),
-                        vec![(4,3)],
-                        HashMap::from([
-                            (4, Rc::clone(&p4)), (3, Rc::clone(&p3))
-                        ])
-                    )
-                )
-            ] 
-        }));
-        let t1 = Rc::new(Task::Compound(CompoundTask{
+            methods: vec![] 
+        });
+        let t1 = Task::Compound(CompoundTask{
             name: "t1".to_string(),
-            methods: vec![
-                Method::new(
-                    "t1_m".to_string(),
-                    HTN::new(
-                        BTreeSet::from([1, 4]),
-                        vec![],
-                        HashMap::from([
-                            (1, Rc::clone(&p1)), (4, Rc::clone(&t4))
-                        ])
-                    )
-                )
-            ] 
-        }));
-        let init_tn = HTN::new(
-            BTreeSet::from([1,2,3]),
-            vec![(1, 3), (2, 3)],
-            HashMap::from([
-                (1, Rc::clone(&t1)), (2, Rc::clone(&t2)), (3, Rc::clone(&t3))
-            ])
-        ).collapse_tn();
-        let tdg = TDG::new(&init_tn);
-        let unreachable_p = Rc::new(Task::Primitive(PrimitiveAction::new(
+            methods: vec![] 
+        });
+        let unreachable_p = Task::Primitive(PrimitiveAction::new(
             "unreach".to_string(),
             1,
             HashSet::from([1]),
             vec![HashSet::from([2]), HashSet::from([3])], 
             vec![HashSet::from([1]), HashSet::from([1])]
-        )));
-        let unreachable_t = Rc::new(Task::Compound(CompoundTask{
+        ));
+        let unreachable_t = Task::Compound(CompoundTask{
             name: "unreach_t".to_string(),
-            methods: vec![
-                Method::new(
-                    "m_unreach".to_string(),
-                    HTN::new(BTreeSet::from([2]), vec![], HashMap::from([
-                        (2, Rc::clone(&unreachable_p)),
-                    ]))
-                )
-            ] 
-        }));
-        assert_eq!(tdg.is_reachable(p1.as_ref()), true);
-        assert_eq!(tdg.is_reachable(t4.as_ref()), true);
-        assert_eq!(tdg.is_reachable(unreachable_p.as_ref()), false);
-        assert_eq!(tdg.is_reachable(unreachable_t.as_ref()), false);
-        assert_eq!(tdg.all_reachables(Rc::clone(&p1)).len(), 1);
+            methods: vec![] 
+        });
+        let domain = Rc::new(DomainTasks::new(vec![p1,p2,p3,p4,t1,t2,t3,t4,unreachable_p,unreachable_t]));
+        let t4_m = Method::new(
+            "t4_m".to_string(),
+            HTN::new(
+                BTreeSet::from([2, 3]),
+                vec![],
+                domain.clone(),
+                HashMap::from([(2, domain.get_id("p2")), (3, domain.get_id("p3"))
+            ]))
+        );
+        let t3_m = Method::new(
+            "t3_m".to_string(),
+            HTN::new(
+                BTreeSet::from([1, 2]),
+                vec![(1,2)],
+                domain.clone(),
+                HashMap::from([(1, domain.get_id("p2")), (2, domain.get_id("p2"))])
+            )
+        );
+        let t2_m = Method::new(
+            "t2_m".to_string(),
+            HTN::new(
+                BTreeSet::from([4, 3]),
+                vec![(4,3)],
+                domain.clone(),
+                HashMap::from([(4, domain.get_id("p4")), (3, domain.get_id("p3"))])
+            )
+        );
+        let t1_m = Method::new(
+            "t1_m".to_string(),
+            HTN::new(
+                BTreeSet::from([1, 4]),
+                vec![],
+                domain.clone(),
+                HashMap::from([(1, domain.get_id("p1")), (4, domain.get_id("t4"))])
+            )
+        );
+        let unreach_m = Method::new(
+            "m_unreach".to_string(),
+            HTN::new(
+                BTreeSet::from([2]), 
+                vec![], 
+                domain.clone(),
+                HashMap::from([(2, domain.get_id("unreach")),
+            ]))
+        );
+        let domain = domain.add_methods(vec![
+            (domain.get_id("t1"), t1_m), (domain.get_id("t2"), t2_m), (domain.get_id("t3"), t3_m),
+            (domain.get_id("t4"), t4_m), (domain.get_id("unreach_t"), unreach_m)
+        ]);
+        let init_tn = HTN::new(
+            BTreeSet::from([1,2,3]),
+            vec![(1, 3), (2, 3)],
+            domain.clone(),
+            HashMap::from([
+                (1, domain.get_id("t1")), (2, domain.get_id("t2")), (3, domain.get_id("t3"))
+            ])
+        );
+        let mut problem = FONDProblem {
+            facts: Facts::new(vec!["1".to_string(), "2".to_string(), "3".to_string()]),
+            tasks: domain.clone(),
+            initial_state: HashSet::from([]),
+            init_tn: init_tn
+        };
+        problem.collapse_tn();
 
+        let tdg = TDG::new(&problem.init_tn);
+        assert_eq!(tdg.is_reachable(domain.get_task(domain.get_id("p1"))), true);
+        assert_eq!(tdg.is_reachable(domain.get_task(domain.get_id("t4"))), true);
+        assert_eq!(tdg.is_reachable(domain.get_task(domain.get_id("unreach"))), false);
+        assert_eq!(tdg.is_reachable(domain.get_task(domain.get_id("unreach_t"))), false);
+        assert_eq!(tdg.all_reachables(domain.get_task(domain.get_id("p1"))).len(), 1);
+        assert_eq!(tdg.all_reachables(domain.get_task(domain.get_id("p2"))).len(), 1);
+        assert_eq!(tdg.all_reachables(domain.get_task(domain.get_id("p3"))).len(), 1);
+        assert_eq!(tdg.all_reachables(domain.get_task(domain.get_id("p4"))).len(), 1);
+        assert_eq!(tdg.all_reachables(domain.get_task(domain.get_id("t2"))).len(), 3);
         let new_tn = HTN::new(
             BTreeSet::from([1]),
             vec![],
-            HashMap::from([
-                (1, Rc::clone(&t1))
-            ])
-        ).collapse_tn();
-        let tdg = TDG::new(&new_tn);
-        assert_eq!(tdg.is_reachable(p3.as_ref()), true);
-        assert_eq!(tdg.is_reachable(p2.as_ref()), true);
-        assert_eq!(tdg.is_reachable(p4.as_ref()), false);
-        assert_eq!(tdg.is_reachable(t1.as_ref()), true);
-        assert_eq!(tdg.is_reachable(t4.as_ref()), true);
-        assert_eq!(tdg.all_reachables(Rc::clone(&t4)).len(), 3);
-        assert_eq!(tdg.all_reachables(Rc::clone(&t4)).contains(&p3), true);
-        assert_eq!(tdg.all_reachables(Rc::clone(&t4)).contains(&p2), true);
-        assert_eq!(tdg.all_reachables(Rc::clone(&t4)).contains(&t4), true);
+            domain.clone(),
+            HashMap::from([(1, domain.get_id("t1"))])
+        );
+        let mut problem2 = FONDProblem {
+            facts: Facts::new(vec!["1".to_string(), "2".to_string(), "3".to_string()]),
+            tasks: domain.clone(),
+            initial_state: HashSet::from([]),
+            init_tn: new_tn
+        };
+        problem2.collapse_tn();
+
+        let tdg = TDG::new(&problem2.init_tn);
+        assert_eq!(tdg.is_reachable(domain.get_task(domain.get_id("p3"))), true);
+        assert_eq!(tdg.is_reachable(domain.get_task(domain.get_id("p2"))), true);
+        assert_eq!(tdg.is_reachable(domain.get_task(domain.get_id("p4"))), false);
+        assert_eq!(tdg.is_reachable(domain.get_task(domain.get_id("t1"))), true);
+        assert_eq!(tdg.is_reachable(domain.get_task(domain.get_id("t4"))), true);
+        let reachables_t4 = tdg.all_reachables(domain.get_task(domain.get_id("t4")));
+        assert_eq!(reachables_t4.len(), 3);
+        assert_eq!(reachables_t4.contains(&domain.get_id("p3")), true);
+        assert_eq!(reachables_t4.contains(&domain.get_id("p2")), true);
+        assert_eq!(reachables_t4.contains(&domain.get_id("t4")), true);
     }
 
     #[test]
     pub fn tn_reachability_test() {
-        let p1 = Rc::new(Task::Primitive(PrimitiveAction::new(
+        let p1 = Task::Primitive(PrimitiveAction::new(
             "p1".to_string(),
             1,
             HashSet::from([1]),
             vec![HashSet::from([2])], 
             vec![HashSet::from([1])]
-        )));
-        let p2 = Rc::new(Task::Primitive(PrimitiveAction::new(
+        ));
+        let p2 = Task::Primitive(PrimitiveAction::new(
             "p2".to_string(),
             1,
             HashSet::from([1]),
             vec![HashSet::from([2]), HashSet::from([2, 5])], 
             vec![HashSet::from([3]), HashSet::from([4])]
-        )));
-        let p3 = Rc::new(Task::Primitive(PrimitiveAction::new(
+        ));
+        let p3 = Task::Primitive(PrimitiveAction::new(
             "p3".to_string(),
             1,
             HashSet::from([2]),
             vec![HashSet::new(),], 
             vec![HashSet::new(),]
-        )));
-        let t4 = Rc::new(Task::Compound(CompoundTask{
+        ));
+        let t4 = Task::Compound(CompoundTask{
             name: "t4".to_string(),
-            methods: vec![
-                Method::new(
-                    "t4_m".to_string(),
-                    HTN::new(BTreeSet::from([2, 3]), vec![], HashMap::from([
-                        (2, Rc::clone(&p2)), (3, Rc::clone(&p3))
-                    ]))
-                )
-            ] 
-        }));
-        let t1 = Rc::new(Task::Compound(CompoundTask{
+            methods: vec![] 
+        });
+        let t1 = Task::Compound(CompoundTask{
             name: "t1".to_string(),
-            methods: vec![
-                Method::new(
-                    "t1_m".to_string(),
-                    HTN::new(
-                        BTreeSet::from([1, 4]),
-                        vec![],
-                        HashMap::from([
-                            (1, Rc::clone(&p1)), (4, Rc::clone(&t4))
-                        ])
-                    )
-                )
-            ] 
-        }));
+            methods: vec![] 
+        });
+        let domain = Rc::new(DomainTasks::new(vec![p1,p2,p3,t4,t1]));
+        let t4_m = Method::new(
+            "t4_m".to_string(),
+            HTN::new(
+                BTreeSet::from([2, 3]), 
+                vec![],
+                domain.clone(),
+                HashMap::from([(2, domain.get_id("p2")), (3, domain.get_id("p3"))])
+            )
+        );
+        let t1_m = Method::new(
+            "t1_m".to_string(),
+            HTN::new(
+                BTreeSet::from([1, 4]),
+                vec![],
+                domain.clone(),
+                HashMap::from([(1, domain.get_id("p1")), (4, domain.get_id("t4"))])
+            )
+        );
+        let domain = domain.add_methods(vec![(4,t1_m), (3, t4_m)]);
         let tn = HTN::new(
             BTreeSet::from([1,2,3]),
             vec![(1,3), (2,3)],
-            HashMap::from([(1, p1), (2,p2), (3,t1)])
-        ).collapse_tn();
-        
+            domain.clone(),
+            HashMap::from([(1, domain.get_id("p1")), (2,domain.get_id("p2")), (3,domain.get_id("t1"))])
+        );
+        let mut problem = FONDProblem {
+            facts: Facts::new(vec![format!("1"),format!("2"),format!("3"),format!("4"),format!("5")]),
+            tasks: domain.clone(),
+            initial_state: HashSet::new(),
+            init_tn: tn
+        };
+        problem.collapse_tn();
+        let tn = problem.init_tn;
         let tdg = TDG::new(&tn);
-        let new_tn = tn.apply_action(1);
-        let result = tdg.reachable_from_tn(&new_tn);
-        assert_eq!(result.len(), 6);
+        if let Task::Compound(CompoundTask { name, methods }) = &*tn.get_all_tasks()[0].borrow() {
+            let new_tn = tn.decompose(*tn.get_nodes().iter().next().unwrap(), &methods[0]);
+            let p1_id = new_tn.get_all_tasks_with_ids().iter().filter(|(x,_)| {
+                x.borrow().get_name() == "p1"
+            }).collect::<Vec<_>>()[0].1;
+            let new_tn = new_tn.apply_action(p1_id);
+            let result = tdg.reachable_from_tn(&new_tn);
+            assert_eq!(result.len(), 5);
+        };
     }
 }

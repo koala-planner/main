@@ -10,7 +10,7 @@ pub enum Task{
     Compound(CompoundTask),
 }
 
-impl PartialEq for Task{
+impl  PartialEq for Task{
     fn eq(&self, other: &Self) -> bool {
         match self {
             Self::Primitive(x) => match other {
@@ -56,7 +56,7 @@ impl Task {
     }
 }
 
-impl fmt::Display for Task {
+impl  fmt::Display for Task {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
             Task::Compound(x) => {

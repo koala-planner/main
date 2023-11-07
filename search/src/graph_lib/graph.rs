@@ -218,6 +218,36 @@ impl Graph {
         }
     }
 
+    // change IDs based on a vec of partial (i.e., not complete set of nodes) new_ids
+    pub fn change_ids(&mut self, new_ids: &HashMap<u32,u32>) {
+        let mut edges = HashMap::new();
+        // remove previous nodes & edges
+        for (prev_id, new_id) in new_ids.iter() {
+            if !self.nodes.remove(&prev_id) {
+                panic!("Node not in the graph");
+            }
+            if self.edges.contains_key(prev_id) {
+                let mut processed_edges = self.edges.remove(prev_id).unwrap();
+                processed_edges = processed_edges.iter().map(|x| {
+                    if new_ids.contains_key(x) {
+                        *new_ids.get(x).unwrap()
+                    } else {
+                        *x
+                    }
+                }).collect();
+                edges.insert(*new_id, processed_edges);
+            }
+        }
+        // add edges
+        for (node, connections) in edges.into_iter() {
+            self.edges.insert(node, connections);
+        }
+        // add new nodes 
+        for (_, new_id) in new_ids.iter() {
+            self.nodes.insert(*new_id);
+        }
+    }
+
 }
 
 #[cfg(test)]

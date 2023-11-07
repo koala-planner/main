@@ -1,28 +1,34 @@
+use crate::domain_description::DomainTasks;
+
 use super::Graph;
 use super::task_structs::{CompoundTask, Method, PrimitiveAction, Task};
 use std::collections::{HashMap, HashSet, BTreeSet};
 use std::fmt::{self, write};
 use rand::distributions::DistString;
 use std::hash::Hash;
-use std::rc::Rc;
+use std::rc::{Rc, Weak};
 use rand::{distributions::Alphanumeric, Rng};
+use std::cell::RefCell;
 
 #[derive(Debug, Clone)]
-pub struct HTN{
+pub struct HTN {
     network: Graph,
+    pub domain: Rc<DomainTasks>, // TODO: Convert to Weak
     // A mapping from task id in the network to its ID in the domain
-    mappings: HashMap<u32, Rc<Task>>,
+    pub mappings: HashMap<u32, u32>,
 }
 
 impl HTN {
     pub fn new(
         tasks: BTreeSet<u32>,
         orderings: Vec<(u32, u32)>,
-        mappings: HashMap<u32, Rc<Task>>,
+        domain: Rc<DomainTasks>,
+        mappings: HashMap<u32, u32>,
     ) -> HTN {
         HTN {
             network: Graph::new(tasks, orderings),
             mappings,
+            domain: domain
         }
     }
 
@@ -30,15 +36,15 @@ impl HTN {
         self.network.get_edges()
     }
 
-    pub fn get_all_tasks(&self) -> Vec<Rc<Task>> {
+    pub fn get_all_tasks(&self) -> Vec<&RefCell<Task>> {
         self.network.nodes.iter().map(|id| {
-            self.get_task(*id).unwrap()
+            self.get_task(*id)
         }).collect()
     }
 
-    pub fn get_all_tasks_with_ids(&self) -> Vec<(Rc<Task>, u32)> {
+    pub fn get_all_tasks_with_ids(&self) -> Vec<(&RefCell<Task>, u32)> {
         self.network.nodes.iter().map(|id| {
-            (self.get_task(*id).unwrap(), *id)
+            (self.get_task(*id), *id)
         }).collect()
     }
 
@@ -50,10 +56,10 @@ impl HTN {
         self.network.count_nodes() == 0
     }
 
-    pub fn get_task(&self, id: u32) -> Option<Rc<Task>> {
-        match self.mappings.get_key_value(&id) {
-            Some((_, y)) => Some(Rc::clone(y)),
-            None => None,
+    pub fn get_task(&self, node_id: u32) -> &std::cell::RefCell<Task> {
+        match self.mappings.get(&node_id) {
+            Some(x) => {self.domain.get_task(*x)},
+            None => {panic!("task not in the network")}
         }
     }
 
@@ -66,39 +72,17 @@ impl HTN {
     }
 
     pub fn decompose(&self, id: u32, method: &Method) -> HTN {
-        match self.mappings.get(&id) {
-            Some(x) => {
-                if let Task::Primitive(_) = x.as_ref() { panic!("task is not primitive") };
+        match &*self.get_task(id).borrow() {
+            Task::Primitive(_) => {
+                panic!("task is primitive");
             },
-            None => {
-                panic!("task does not exist")
-            }
+            _ => {}
         }
-        // TODO: Refactor this function
-        let mut subgraph_nodes = method.decomposition.network.nodes.clone();
-        let mut subgraph_edges = method.decomposition.network.edges.clone();
-        let mut subgraph_mappings = method.decomposition.mappings.clone();
         // Changing IDs
         let network_max_id = self.network.nodes.iter().max().unwrap();
-        let subgraph_max_id = subgraph_nodes.iter().max().unwrap();
+        let subgraph_max_id = method.decomposition.network.nodes.iter().max().unwrap();
         let max_id = *network_max_id.max(subgraph_max_id) + 1;
-        let new_ids: Vec<(u32, u32)> = subgraph_nodes.iter().cloned().zip(max_id..).collect();
-        for (prev_id, new_id) in new_ids.iter() {
-            let mapping_val = subgraph_mappings.remove(&prev_id).unwrap();
-            subgraph_mappings.insert(*new_id, mapping_val);
-            if subgraph_edges.contains_key(&prev_id) {
-                let mut edges: BTreeSet<u32> = subgraph_edges.remove(&prev_id).unwrap();
-                for (i, j) in new_ids.iter() {
-                    if edges.contains(&i){
-                        edges.remove(i);
-                        edges.insert(*j);
-                    }
-                }
-                subgraph_edges.insert(*new_id, edges);
-            }
-            subgraph_nodes.remove(prev_id);
-            subgraph_nodes.insert(*new_id);
-        }
+        let relabeled_subgraph = HTN::relabel_nodes(&method.decomposition, max_id);
         // Creating Graph
         let mut new_graph = self.network.clone();
         let outgoing_edges = self.network.get_outgoing_edges(id);
@@ -106,67 +90,101 @@ impl HTN {
         new_graph = new_graph.remove_node(id);
         new_graph = new_graph.add_subgraph(
             Graph::new(
-                subgraph_nodes.clone(),
-                Graph::convert_edges_to_vec(&subgraph_edges),
+                relabeled_subgraph.get_nodes().clone(),
+                relabeled_subgraph.network.get_edges(),
             ),
             incoming_edges,
             outgoing_edges,
         );
         let mut new_mappings = self.mappings.clone();
         new_mappings.remove(&id);
-        for (id, m) in subgraph_mappings {
-            new_mappings.insert(id, m);
+        for (id, m) in relabeled_subgraph.mappings.iter() {
+            new_mappings.insert(*id,*m);
         }
-        let new_nodes = self
-            .network
-            .nodes
-            .iter()
-            .filter(|x| **x != id)
-            .cloned()
-            .collect::<BTreeSet<u32>>()
-            .union(&subgraph_nodes)
-            .cloned()
-            .collect();
-        HTN::new(new_nodes, new_graph.get_edges(), new_mappings)
+        let new_nodes = self.network.nodes
+                                                    .iter()
+                                                    .filter(|x| **x != id)
+                                                    .cloned()
+                                                    .collect::<BTreeSet<u32>>()
+                                                    .union(&relabeled_subgraph.get_nodes())
+                                                    .cloned()
+                                                    .collect();
+        HTN::new(new_nodes, new_graph.get_edges(), self.domain.clone(), new_mappings )
     }
 
-    pub fn is_isomorphic(tn1: &HTN, tn2: &HTN) -> bool {
-        let layers_1 = tn1.network.to_layers();
-        let layers_2 = tn2.network.to_layers();
-        if layers_1.len() != layers_2.len() {
-            return false;
-        }
-        let tasks_1 = tn1.layers_to_tasks(layers_1);
-        let tasks_2 = tn2.layers_to_tasks(layers_2);
-
-        for (x, y) in tasks_1.into_iter().zip(tasks_2.into_iter()) {
-            if x != y {
-                return false;
+    pub fn change_mappings(&mut self, changes: Vec<(u32, u32)>) {
+        for (node_id, new_task_id) in changes {
+            match self.mappings.remove(&node_id) {
+                Some(_) => {
+                    self.mappings.insert(node_id, new_task_id);
+                },
+                None => {panic!("Node not in the network")}
             }
         }
-
-        return true;
     }
 
+    pub fn relabel_nodes(tn: &HTN, start_index: u32) -> HTN {
+        let new_ids: HashMap<u32, u32> = tn.network.nodes.iter().cloned().zip(start_index..).collect();
+        let mut subgraph = tn.network.clone();
+        subgraph.change_ids(&new_ids);
+        let new_mappings: HashMap<u32, u32> = tn.mappings.iter().map(|(k, v)| {
+            match new_ids.get(k) {
+                Some(new_id) => {
+                    (*new_id, *v)
+                }
+                None => {
+                    panic!("ID is not present")
+                }
+            }
+        }).collect();
+        HTN { network: subgraph, domain: tn.domain.clone(), mappings: new_mappings }
+    }
+
+    // pub fn is_isomorphic(tn1: &HTN, tn2: &HTN) -> bool {
+    //     let layers_1 = tn1.network.to_layers();
+    //     let layers_2 = tn2.network.to_layers();
+    //     if layers_1.len() != layers_2.len() {
+    //         return false;
+    //     }
+    //     let tasks_1 = tn1.layers_to_tasks(layers_1);
+    //     let tasks_2 = tn2.layers_to_tasks(layers_2);
+
+    //     for (x, y) in tasks_1.into_iter().zip(tasks_2.into_iter()) {
+    //         if x != y {
+    //             return false;
+    //         }
+    //     }
+
+    //     return true;
+    // }
+
     pub fn apply_action(&self, id: u32) -> HTN {
+        if !self.is_primitive(id) {
+            panic!("Task is not primitive")
+        }
         let mut new_mapping = self.mappings.clone();
         new_mapping.remove(&id);
         let new_graph = self.network.remove_node(id);
-        HTN { network: new_graph, mappings: new_mapping }
+        HTN { network: new_graph, mappings: new_mapping, domain: self.domain.clone()}
     }
 
-    fn layers_to_tasks(&self, layers: Vec<HashSet<u32>>) -> Vec<HashSet<&Task>> {
-        let mut result = Vec::with_capacity(layers.len());
-        for layer in layers.into_iter() {
-            let tasks = layer.into_iter().map(|x| self.mappings.get(&x).unwrap().as_ref());
-            result.push(tasks.collect());
-        }
-        result
-    }
+    // fn layers_to_tasks(&self, layers: Vec<HashSet<u32>>) -> Vec<HashSet<&Task>> {
+    //     let mut result = Vec::with_capacity(layers.len());
+    //     for layer in layers.into_iter() {
+    //         let tasks = layer.into_iter().map(|x| {
+    //             let task_id = self.mappings.get(&x).unwrap();
+    //             self.get_task(*task_id)
+    //         });
+    //         result.push(tasks.collect());
+    //     }
+    //     result
+    // }
 
     pub fn is_primitive(&self, id: u32) -> bool {
-        let task = self.mappings.get(&id).unwrap();
-        match task.as_ref() {
+        if !self.mappings.contains_key(&id) {
+            panic!("id not in network");
+        }
+        match *self.get_task(id).borrow() {
             Task::Primitive(_) => true,
             _ => false
         }
@@ -187,79 +205,55 @@ impl HTN {
         (u_c, u_a)
     }
 
-    // collapses all tasks in the network into one abstract task
-    pub fn collapse_tn(&self) -> HTN {
-        let rand_s: String = Alphanumeric.sample_string(&mut rand::thread_rng(), 16);
-        let new_task = Task::Compound(CompoundTask {
-            // Planner Generated Task
-            name: "__P_G_T_".to_string() + &rand_s,
-            methods: vec![Method::new(
-                "__P_G_M".to_string(),
-                self.clone()
-            )]
-        });
-        let max_id = (*self.network.nodes.iter().max().unwrap()) + 1;
-        let mut new_mappings = self.mappings.clone();
-        new_mappings.insert(max_id, Rc::new(new_task));
-        HTN::new(
-            BTreeSet::from([max_id]), 
-            vec![], 
-            new_mappings
-        )
-    }
-
     pub fn get_nodes(&self) -> &BTreeSet<u32> {
         &self.network.nodes
     }
-
-    pub fn change_mappings(&self, new_mappings: HashMap<u32, Rc<Task>>) -> HTN {
-        HTN { network: self.network.clone(), mappings: new_mappings }
-    }
-
-    pub fn change_task(&mut self, id: u32, new_task: Rc<Task>) {
-        self.mappings.remove(&id);
-        self.mappings.insert(id, new_task);
-    }
-
+    
     pub fn contains_task(&self, name: &str) -> bool {
-        for (_, task) in self.mappings.iter() {
-            if task.get_name() == name {
+        for (task_id, _) in self.mappings.iter() {
+            if self.get_task(*task_id).borrow().get_name() == name {
                 return true;
             }
         }
         return false;
     }
+
+    pub fn change_domain(&mut self, new_domain: Rc<DomainTasks>) {
+        self.domain = new_domain;
+    }
     
 }
 
-impl fmt::Display for HTN {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
-        let layers = self.network.to_layers();
-        let layers = self.layers_to_tasks(layers);
-        for (i, layer) in layers.iter().enumerate() {
-            write!(f, "layer {}:\n", i);
-            for task in layer.iter() {
-                write!(f, "\t{}", task);
-                if let Task::Compound(CompoundTask { name: _, methods }) = task {
-                    for method in methods.iter() {
-                        write!(f, "\t\t(M) {}\n", method.name);
-                    }
-                } else {
-                    write!(f, "\n");
-                }
-            }
-        }
-        Ok(())
-     }
-}
+// impl  fmt::Display for HTN {
+//     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+//         let layers = self.network.to_layers();
+//         let layers = self.layers_to_tasks(layers);
+//         for (i, layer) in layers.iter().enumerate() {
+//             write!(f, "layer {}:\n", i);
+//             for task in layer.iter() {
+//                 write!(f, "\t{}", task);
+//                 if let Task::Compound(CompoundTask { name: _, methods }) = task {
+//                     for method in methods.iter() {
+//                         write!(f, "\t\t(M) {}\n", method.name);
+//                     }
+//                 } else {
+//                     write!(f, "\n");
+//                 }
+//             }
+//         }
+//         Ok(())
+//      }
+// }
 
 #[cfg(test)]
 mod tests {
-    use crate::domain_description::DomainTasks;
+    use std::vec;
+
+    use crate::domain_description::{DomainTasks, FONDProblem, Facts};
 
     use super::*;
 
-    fn create_initial_tasks() -> (Rc<Task>, Rc<Task>, Rc<Task>, Rc<Task>) {
+    fn create_initial_tasks() -> DomainTasks {
         let empty = HashSet::new();
         let t1 = Task::Primitive(PrimitiveAction::new(
             "ObtainPermit".to_string(),
@@ -283,24 +277,21 @@ mod tests {
             vec![empty.clone(),],
             vec![empty.clone(),],
         ));
-        let (t1, t2, t3, t4) = (Rc::new(t1), Rc::new(t2), Rc::new(t3), Rc::new(t4));
-        (t1, t2, t3, t4)
+        DomainTasks::new(vec![t1,t2,t3,t4])
     }
 
     #[test]
     fn instantiation() {
         let t: BTreeSet<u32> = BTreeSet::from([1, 2, 3, 4]);
-        let (t1, t2, t3, t4) = create_initial_tasks();
-        let alpha =
-            HashMap::from([(1, Rc::clone(&t1)), (2, Rc::clone(&t2)), (3, Rc::clone(&t3)), (4, Rc::clone(&t4))]);
-        let orderings: Vec<(u32, u32)> = Vec::from([(1, 3), (2, 3), (3, 4)]);
-        let network = HTN::new(t, orderings, alpha);
+        let domain = Rc::new(create_initial_tasks());
+        let alpha = HashMap::from([(1, 0), (2, 1), (3, 2), (4, 3)]);
+        let orderings = Vec::from([(1, 3), (2, 3), (3, 4)]);
+        let network = HTN::new(t, orderings, domain.clone(), alpha);
         assert_eq!(network.count_tasks(), 4);
-        assert_eq!(network.get_task(1).unwrap(), t1);
-        assert_eq!(network.get_task(2).unwrap(), t2);
-        assert_eq!(network.get_task(3).unwrap(), t3);
-        assert_eq!(network.get_task(4).unwrap(), t4);
-        assert_eq!(network.get_task(5), None);
+        assert_eq!(network.get_task(1), domain.get_task(0));
+        assert_eq!(network.get_task(2), domain.get_task(1));
+        assert_eq!(network.get_task(3), domain.get_task(2));
+        assert_eq!(network.get_task(4), domain.get_task(3));
     }
 
     fn decomposition_tasks() -> (
@@ -352,11 +343,10 @@ mod tests {
     #[test]
     fn unconstrained_tasks_test() {
         let t: BTreeSet<u32> = BTreeSet::from([1, 2, 3, 4]);
-        let (t1, t2, t3, t4) = create_initial_tasks();
-        let alpha =
-            HashMap::from([(1, t1), (2, t2), (3, t3), (4, t4)]);
+        let domain = Rc::new(create_initial_tasks());
+        let alpha = HashMap::from([(1, 1), (2, 2), (3, 3), (4, 4)]);
         let orderings: Vec<(u32, u32)> = Vec::from([(1, 3), (2, 3), (3, 4)]);
-        let network = HTN::new(t, orderings, alpha);
+        let network = HTN::new(t, orderings, domain.clone(), alpha);
         let unconstrained = network.get_unconstrained_tasks();
         assert_eq!(unconstrained, BTreeSet::from([1, 2]));
     }
@@ -364,68 +354,86 @@ mod tests {
     #[test]
     fn decomposition_test() {
         let t: BTreeSet<u32> = BTreeSet::from([1, 2, 3, 4]);
-        let (t1, t2, t3, t4) = create_initial_tasks();
+        let mut domain = create_initial_tasks();
         let (t5, t6, t7, t8, t9) = decomposition_tasks();
+        domain.add_task(t5.clone());
+        domain.add_task(t6.clone());
+        domain.add_task(t7.clone());
+        domain.add_task(t8.clone());
+        domain.add_task(t9.clone());
+        let domain = Rc::new(domain);
         let t3_method = Method::new(
             "method-01".to_string(),
             HTN::new(
                 BTreeSet::from([1, 2, 3, 4, 5]),
                 Vec::from([(1, 2), (2, 3), (2, 4), (3, 5), (4, 5)]),
+                domain.clone(),
                 HashMap::from(
-                    [(1, Rc::new(t5)), (2, Rc::new(t6)), (3, Rc::new(t7)), (4, Rc::new(t8)), (5, Rc::new(t9))]
-                ),
+                    [(1, domain.get_id(&t5.get_name())), (2, domain.get_id(&t6.get_name())),
+                    (3, domain.get_id(&t7.get_name())), (4, domain.get_id(&t8.get_name())),
+                    (5, domain.get_id(&t9.get_name()))]
+                )
             ),
         );
-        let alpha = HashMap::from([(1, t1), (2, t2), (3, t3), (4, t4)]);
-        let orderings: Vec<(u32, u32)> = Vec::from([(1, 3), (2, 3), (3, 4)]);
-        let network = HTN::new(t, orderings, alpha);
-        let result = network.decompose(3, &t3_method);
-        assert_eq!(result.count_tasks(), 8);
-        assert_eq!(result.get_unconstrained_tasks(), BTreeSet::from([1, 2]));
-        assert_eq!(Graph::convert_edges_to_vec(&result.network.edges).len(), 8);
-        assert_eq!(result.get_task(3), None);
-        assert_eq!(result.network.edges.get(&1).unwrap().len(), 1);
+       let domain = domain.add_methods(vec![(domain.get_id("Construct"), t3_method.clone())]);
+       let alpha = HashMap::from([(1, 0), (2, 1), (3, 2), (4, 3)]);
+       let orderings: Vec<(u32, u32)> = Vec::from([(1, 3), (2, 3), (3, 4)]);
+       let network = HTN::new(t, orderings, domain.clone(), alpha);
+       let c_task = domain.get_task(domain.get_id("Construct"));
+       if let Task::Compound(CompoundTask { name, methods }) = &*c_task.borrow() {
+            let result = network.decompose(3, &methods[0]);
+            assert_eq!(result.count_tasks(), 8);
+            assert_eq!(result.get_unconstrained_tasks(), BTreeSet::from([1, 2]));
+            assert_eq!(Graph::convert_edges_to_vec(&result.network.edges).len(), 8);
+            assert_eq!(result.contains_task("Construct"), false);
+            assert_eq!(result.network.edges.get(&1).unwrap().len(), 1);
+       }
+       else {
+        panic!()
+       };
     }
 
     #[test]
-    pub fn isomorphism_test() {
-        let (t1, t2, t3, t4) = create_initial_tasks();
-        // first graph
-        let nodes1: BTreeSet<u32> = BTreeSet::from([1, 2, 3, 4]);
-        let orderings1: Vec<(u32, u32)> = Vec::from([(1, 3), (2, 3), (3, 4)]);
-        let alpha =
-        HashMap::from([(1, t1), (2, t2), (3, t3), (4, t4)]);
-        let htn1 = HTN::new(
-            nodes1,
-            orderings1,
-            alpha,
-        );
+    // pub fn isomorphism_test() {
+    //     let domain = Rc::new(create_initial_tasks());
+    //     // first graph
+    //     let nodes1: BTreeSet<u32> = BTreeSet::from([1, 2, 3, 4]);
+    //     let orderings1: Vec<(u32, u32)> = Vec::from([(1, 3), (2, 3), (3, 4)]);
+    //     let alpha =
+    //     HashMap::from([(1, 1), (2, 2), (3, 3), (4, 4)]);
+    //     let htn1 = HTN::new(
+    //         nodes1,
+    //         orderings1,
+    //         domain.clone(),
+    //         alpha,
+    //     );
 
-        let (t5, t6, t7, t8) = create_initial_tasks();
-        // second graph
-        let nodes2: BTreeSet<u32> = BTreeSet::from([5, 6, 7, 8]);
-        let orderings2: Vec<(u32, u32)> = Vec::from([(5, 7), (6, 7), (7, 8)]);
-        let htn2 = HTN::new(
-            nodes2,
-            orderings2,
-            HashMap::from([(5, t5), (6, t6), (7, t7), (8, t8)]),
-        );
+    //     let domain2 = Rc::new(create_initial_tasks());
+    //     // second graph
+    //     let nodes2: BTreeSet<u32> = BTreeSet::from([5, 6, 7, 8]);
+    //     let orderings2: Vec<(u32, u32)> = Vec::from([(5, 7), (6, 7), (7, 8)]);
+    //     let htn2 = HTN::new(
+    //         nodes2,
+    //         orderings2,
+    //         domain2.clone(),
+    //         HashMap::from([(5, 1), (6, 2), (7, 3), (8, 4)]),
+    //     );
 
-        let result = HTN::is_isomorphic(&htn1, &htn2);
-        assert_eq!(result, true);
-    }
+    //     let result = HTN::is_isomorphic(&htn1, &htn2);
+    //     assert_eq!(result, true);
+    // }
 
     #[test]
     pub fn is_primitive_test() {
-        let (t1, t2, t3, t4) = create_initial_tasks();
+        let domain = Rc::new(create_initial_tasks());
         // first graph
         let nodes1: BTreeSet<u32> = BTreeSet::from([1, 2, 3, 4]);
         let orderings1: Vec<(u32, u32)> = Vec::from([(1, 3), (2, 3), (3, 4)]);
-        let alpha =
-        HashMap::from([(1, t1), (2, t2), (3, t3), (4, t4)]);
+        let alpha = HashMap::from([(1, 0), (2, 1), (3, 2), (4, 3)]);
         let htn = HTN::new(
             nodes1,
             orderings1,
+            domain.clone(),
             alpha,
         );
         assert_eq!(htn.is_primitive(1), true);
@@ -436,40 +444,40 @@ mod tests {
 
     #[test]
     pub fn apply_action_test() {
-        let (t1, t2, t3, t4) = create_initial_tasks();
+        let domain = Rc::new(create_initial_tasks());
         // first graph
         let nodes1: BTreeSet<u32> = BTreeSet::from([1, 2, 3, 4]);
         let orderings1: Vec<(u32, u32)> = Vec::from([(1, 3), (2, 3), (3, 4)]);
-        let alpha =
-        HashMap::from([(1, t1), (2, t2), (3, t3), (4, t4)]);
+        let alpha = HashMap::from([(1, 0), (2, 1), (3, 2), (4, 3)]);
         let htn = HTN::new(
             nodes1,
             orderings1,
+            domain.clone(),
             alpha,
         );
         let new_htn = htn.apply_action(2);
         assert_eq!(new_htn.count_tasks(), 3);
-        assert_eq!(new_htn.get_task(2), None);
+        assert_eq!(new_htn.contains_task("HireBuilder"), false);
         assert_eq!(new_htn.is_primitive(3), false);
         assert_eq!(new_htn.mappings.contains_key(&2), false);
         let new_htn_2 = new_htn.apply_action(1);
-        assert_eq!(new_htn_2.count_tasks(), 2);
-        assert_eq!(new_htn_2.get_task(1), None);
+        assert_eq!(new_htn_2.get_nodes(), &BTreeSet::from([3,4]));
         assert_eq!(new_htn_2.is_primitive(3), false);
         assert_eq!(new_htn_2.mappings.contains_key(&1), false);
     }
 
     #[test]
     pub fn last_action_test() {
-        let (t1, t2, t3, t4) = create_initial_tasks();
+        let domain = Rc::new(create_initial_tasks());
         // first graph
         let nodes1: BTreeSet<u32> = BTreeSet::from([1, 2, 4]);
         let orderings1: Vec<(u32, u32)> = Vec::from([(1, 4), (2, 4)]);
         let alpha =
-        HashMap::from([(1, t1), (2, t2), (4, t4)]);
+        HashMap::from([(1, 0), (2, 1), (4, 3)]);
         let htn = HTN::new(
             nodes1,
             orderings1,
+            domain.clone(),
             alpha,
         );
         let new_htn = htn.apply_action(2);
@@ -480,14 +488,15 @@ mod tests {
 
     #[test]
     pub fn is_empty() {
-        let (t1, t2, t3, t4) = create_initial_tasks();
+        let domain = Rc::new(create_initial_tasks());
         let nodes: BTreeSet<u32> = BTreeSet::from([1, 2, 4]);
         let orderings: Vec<(u32, u32)> = Vec::from([(1, 4), (2, 4)]);
         let alpha =
-        HashMap::from([(1, t1), (2, t2), (4, t4)]);
+        HashMap::from([(1, 1), (2, 2), (4, 4)]);
         let htn = HTN::new(
             nodes,
             orderings,
+            domain.clone(),
             alpha,
         );
         assert_eq!(htn.is_empty(), false);
@@ -495,6 +504,7 @@ mod tests {
         let empty_htn = HTN::new(
             BTreeSet::new(),
             Vec::new(),
+            domain.clone(),
             HashMap::new(),
         );
         assert_eq!(empty_htn.is_empty(), true);
@@ -503,11 +513,10 @@ mod tests {
     #[test]
     pub fn separate_tasks_test() {
         let t: BTreeSet<u32> = BTreeSet::from([1, 2, 3, 4]);
-        let (t1, t2, t3, t4) = create_initial_tasks();
-        let alpha =
-            HashMap::from([(1, Rc::clone(&t1)), (2, Rc::clone(&t2)), (3, Rc::clone(&t3)), (4, Rc::clone(&t4))]);
+        let domain= Rc::new(create_initial_tasks());
+        let alpha = HashMap::from([(1, 0), (2, 1), (3, 2), (4, 3)]);
         let orderings: Vec<(u32, u32)> = vec![];
-        let network = HTN::new(t.clone(), orderings, alpha);
+        let network = HTN::new(t.clone(), orderings, domain.clone(), alpha);
         assert_eq!(
             network.separate_tasks(&t),
             (BTreeSet::from([3]), BTreeSet::from([1,2,4]))
@@ -515,51 +524,78 @@ mod tests {
     }
 
     #[test]
-    pub fn collapse_tn_test() {
+    pub fn relabel_test() {
         let t: BTreeSet<u32> = BTreeSet::from([1, 2, 3, 4]);
-        let (t1, t2, t3, t4) = create_initial_tasks();
-        let alpha =
-            HashMap::from([(1, Rc::clone(&t1)), (2, Rc::clone(&t2)), (3, Rc::clone(&t3)), (4, Rc::clone(&t4))]);
+        let mut domain = Rc::new(create_initial_tasks());
+        let alpha = HashMap::from([(1, 0), (2, 1), (3, 2), (4, 3)]);
         let orderings: Vec<(u32, u32)> = vec![];
-        let network = HTN::new(t.clone(), orderings, alpha);
-        let new_tn = network.collapse_tn();
-        assert_eq!(new_tn.count_tasks(), 1);
-        assert_eq!(new_tn.get_unconstrained_tasks(), BTreeSet::from([5]));
+        let network = HTN::new(t.clone(), orderings, domain.clone(), alpha);
+        let new_tn = HTN::relabel_nodes(&network, 2);
+        assert_eq!(new_tn.get_nodes().len(), 4);
+        assert_eq!(new_tn.get_task(2).borrow().get_name(), format!("ObtainPermit"));
+        assert_eq!(new_tn.get_task(3).borrow().get_name(), format!("HireBuilder"));
+        assert_eq!(new_tn.get_task(4).borrow().get_name(), format!("Construct"));
+        assert_eq!(new_tn.get_task(5).borrow().get_name(), format!("PayBuilder"));
     }
 
     #[test]
-    pub fn recursive_decompoition_test() {
+    pub fn collapse_tn_test() {
+        let t: BTreeSet<u32> = BTreeSet::from([1, 2, 3, 4]);
+        let mut domain = Rc::new(create_initial_tasks());
+        let alpha = HashMap::from([(1, 0), (2, 1), (3, 2), (4, 3)]);
+        let orderings: Vec<(u32, u32)> = vec![];
+        let network = HTN::new(t.clone(), orderings, domain.clone(), alpha);
+        let mut problem = FONDProblem {
+            facts: Facts::new(vec![]),
+            tasks: domain,
+            initial_state: HashSet::new(),
+            init_tn: network
+        };
+        problem.collapse_tn();
+        assert_eq!(problem.init_tn.count_tasks(), 1);
+        assert_eq!(problem.init_tn.get_unconstrained_tasks(), BTreeSet::from([1]));
+    }
+
+    #[test]
+    pub fn recursive_decomposition_test() {
         let t = Task::Compound(CompoundTask { name: "recursive".to_owned(), methods: vec![] });
-        let mut tasks = DomainTasks::new(vec![t.clone()]);
-        let r = Rc::new(t);
-        tasks.add_method(
-            0,
+        let mut domain = Rc::new(DomainTasks::new(vec![t]));
+        let domain = domain.add_methods(vec![
+            (0,
             Method::new(
                 "m1".to_owned(), HTN::new(
                 BTreeSet::from([1, 2]),
                 vec![],
-                HashMap::from([(1, r.clone()), (2, r.clone())])
-                ))
-        );
-        let new_task = tasks.get_task(0);
+                domain.clone(),
+                HashMap::from([(1, 0), (2, 0)])
+                )))
+        ]);
         let tn = HTN::new(
             BTreeSet::from([1]),
             vec![],
-            HashMap::from([(1,new_task.clone())])
+            domain.clone(),
+            HashMap::from([(1,0)])
         );
-        if let Task::Compound(CompoundTask { name: _, methods }) = new_task.as_ref() {
-            assert_eq!(methods.len(), 1);
-            println!("{:?}", methods);
-            let new_tn = tn.decompose(1, &methods[0]);
-            assert_eq!(new_tn.count_tasks(), 2);
-            for t in new_tn.get_all_tasks() {
-                if let Task::Compound(CompoundTask { name, methods }) = t.as_ref(){
-                    assert_eq!(name, "recursive");
-                    assert_eq!(methods.len(), 1);
+        match &*domain.get_task(0).borrow() {
+            Task::Compound(CompoundTask { name: _, methods }) => {
+                assert_eq!(methods.len(), 1);
+                let new_tn = tn.decompose(1, &methods[0]);
+                assert_eq!(new_tn.count_tasks(), 2);
+                for t in new_tn.get_all_tasks() {
+                    match &*t.borrow() {
+                        Task::Compound(CompoundTask { name, methods }) => {
+                            assert_eq!(name, "recursive");
+                            assert_eq!(methods.len(), 1);
+                            for (_, v) in new_tn.mappings.iter() {
+                                assert_eq!(*v, 0);
+                            }
+                        },
+                        Task::Primitive(_) => {}
+                    }
                 }
-            }
-            println!("{:?}", new_tn.mappings);
-        }
-
+                
+            },
+            _ => {panic!("wrong task")}
+        };
     }
 }

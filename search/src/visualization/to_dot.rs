@@ -35,8 +35,8 @@ impl ToDOT {
     pub fn htn(htn: &HTN) -> String {
         let node_ids = htn.get_nodes();
         let node_task: Vec<(String, bool)> = node_ids.iter().map(|x| {
-            let task = htn.get_task(*x).unwrap();
-            (task.get_name(), task.is_primitive())
+            let task = htn.get_task(*x);
+            (task.borrow().get_name(), task.borrow().is_primitive())
         }).collect();
         let mut vertices = String::new();
         for (id, (name, is_primitive)) in node_ids.iter().zip(node_task.iter()) {

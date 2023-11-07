@@ -17,9 +17,3 @@ impl Method {
         }
     }
 }
-
-impl fmt::Display for Method {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(f, "method {}: {}", self.name, self.decomposition)
-    }
-}

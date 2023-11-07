@@ -2,50 +2,53 @@ use std::collections::HashSet;
 use std::rc::Rc;
 
 use super::TDG;
-use crate::domain_description::{ClassicalDomain, Facts};
+use crate::domain_description::{ClassicalDomain, Facts, DomainTasks};
 use crate::task_network::{PrimitiveAction, Task};
 use crate::{domain_description::FONDProblem, task_network::HTN};
 use regex::Regex;
 
 #[derive(Debug)]
-pub struct ToClassical {
+pub struct ToClassical{
     tdg: TDG,
+    original_tasks: Rc<DomainTasks>,
     pub domain: ClassicalDomain,
 }
 
-impl ToClassical {
+impl ToClassical  {
     pub fn new(domain: &FONDProblem) -> ToClassical {
         let mut new_facts = domain.facts.clone();
         // top down encoding
         let tasks = domain.tasks.get_all_tasks();
-        let top_down_facts = tasks.iter().map(|x| {x.get_name()}).collect();
+        let top_down_facts = tasks.iter().map(|x| {x.borrow().get_name()}).collect();
         new_facts = new_facts.extend(top_down_facts);
         // bottom-up encoding
         let bottom_up_facts: Vec<String> = domain.tasks.get_all_tasks().iter()
-            .filter(|x| x.is_primitive())
-            .map(|x| x.get_name() + "_reachable")
+            .filter(|x| x.borrow().is_primitive())
+            .map(|x| x.borrow().get_name() + "_reachable")
             .collect();
         new_facts = new_facts.extend(bottom_up_facts);
 
         let new_actions = ToClassical::encode(&domain, &new_facts);
         let classic_domain = ClassicalDomain { facts: new_facts, actions: new_actions };
-        ToClassical { domain: classic_domain, tdg: TDG::new(&domain.init_tn) }
+        let tdg = TDG::new(&domain.init_tn);
+        println!("{}", tdg);
+        ToClassical { domain: classic_domain, original_tasks: domain.tasks.clone(), tdg: tdg }
     }
 
     fn encode(domain: &FONDProblem, facts: &Facts) -> Vec<PrimitiveAction> {
         let mut result = vec![];
         let tasks = domain.tasks.get_all_tasks();
         for task in tasks.iter() {
-            match task.as_ref() {
+            match &*task.borrow() {
                 Task::Compound(c) => {
                     for method in c.methods.iter() {
                         let subtasks = method.decomposition.get_all_tasks();
                         let mut ids = HashSet::new();
                         for subtask in subtasks.iter() {
-                            let task_name = subtask.get_name();
+                            let task_name = subtask.borrow().get_name();
                             ids.insert(facts.get_id(&task_name));
                         }
-                        let task_id = facts.get_id(&task.get_name());
+                        let task_id = facts.get_id(&task.borrow().get_name());
                         let new_action = PrimitiveAction::new(
                             method.name.clone(),
                             0,
@@ -85,7 +88,7 @@ impl ToClassical {
                     result.push(new_action);
                 }
             }
-        }
+        };
         result
     }
 
@@ -93,8 +96,9 @@ impl ToClassical {
         let reachables = self.tdg.reachable_from_tn(tn);
         let mut satisfied_preconds = HashSet::new();
         for task in reachables.iter() {
-            if let Task::Primitive(prim) = task.as_ref() {
-                let mut fact_name = task.get_name();
+            let task = self.original_tasks.get_task(*task);
+            if let Task::Primitive(prim) = &*task.borrow() {
+                let mut fact_name = prim.name.clone();
                 if !prim.is_deterministic() {
                     fact_name += "__determinized";
                     let n_effects = prim.add_effects.len() as u32;
@@ -117,12 +121,12 @@ impl ToClassical {
     pub fn compute_goal_state(&self, tn: &HTN) -> HashSet<u32> {
         let mut goal = HashSet::new();
         for task in tn.get_all_tasks().iter() {
-            let mut name = task.get_name();
-            if let Task::Primitive(p) = task.as_ref() {
+            let mut name = task.borrow().get_name();
+            if let Task::Primitive(p) = &*task.borrow() {
                 if !p.is_deterministic() {
                     name += "__determinized";
                 }
-            }
+            };
             let g = self.domain.facts.get_id(&name);
             goal.insert(g);
         }
@@ -134,106 +138,111 @@ impl ToClassical {
 mod tests {
     use super::*;
     use super::super::{Method, CompoundTask};
+    use std::cell::RefCell;
     use std::collections::{HashMap, BTreeSet};
     use crate::domain_description::DomainTasks;
     fn generate_problem() -> FONDProblem {
-        let p1 = Rc::new(Task::Primitive(PrimitiveAction::new(
-            "P1".to_string(),
+        let p1 = Task::Primitive(PrimitiveAction::new(
+            "p1".to_string(),
             1,
             HashSet::new(),
             vec![HashSet::from([1])], 
             vec![HashSet::new()]
-        )));
-        let p2 = Rc::new(Task::Primitive(PrimitiveAction::new(
-            "P2".to_string(),
+        ));
+        let p2 = Task::Primitive(PrimitiveAction::new(
+            "p2".to_string(),
             1,
             HashSet::from([2]),
             vec![HashSet::from([3])], 
             vec![HashSet::new()]
-        )));
-        let p3 = Rc::new(Task::Primitive(PrimitiveAction::new(
-            "P3".to_string(),
+        ));
+        let p3 = Task::Primitive(PrimitiveAction::new(
+            "p3".to_string(),
             1,
             HashSet::from([3]),
             vec![HashSet::from([2])], 
             vec![HashSet::new()]
-        )));
-        let p4 = Rc::new(Task::Primitive(PrimitiveAction::new(
-            "P4".to_string(),
+        ));
+        let p4 = Task::Primitive(PrimitiveAction::new(
+            "p4".to_string(),
             1,
             HashSet::from([1]),
             vec![HashSet::from([2])], 
             vec![HashSet::from([1])]
-        )));
-        let t4 = Rc::new(Task::Compound(CompoundTask{
+        ));
+        let t4 = Task::Compound(CompoundTask{
             name: "t4".to_string(),
-            methods: vec![
-                Method::new(
-                    "t4_m".to_string(),
-                    HTN::new(BTreeSet::from([2, 3]), vec![], HashMap::from([
-                        (2, Rc::clone(&p2)), (3, Rc::clone(&p3))
-                    ]))
-                )
-            ] 
-        }));
-        let t3 = Rc::new(Task::Compound(CompoundTask{
+            methods: vec![] 
+        });
+        let t3 = Task::Compound(CompoundTask{
             name: "t3".to_string(),
-            methods: vec![
-                Method::new(
-                    "t3_m".to_string(),
-                    HTN::new(
-                        BTreeSet::from([1, 2]),
-                        vec![(1,2)],
-                        HashMap::from([
-                            (1, Rc::clone(&p2)), (2, Rc::clone(&p2))
-                        ])
-                    )
-                )
-            ] 
-        }));
-        let t2 = Rc::new(Task::Compound(CompoundTask{
+            methods: vec![] 
+        });
+        let t2 = Task::Compound(CompoundTask{
             name: "t2".to_string(),
-            methods: vec![
-                Method::new(
-                    "t2_m".to_string(),
-                    HTN::new(
-                        BTreeSet::from([4, 3]),
-                        vec![(4,3)],
-                        HashMap::from([
-                            (4, Rc::clone(&p4)), (3, Rc::clone(&p3))
-                        ])
-                    )
-                )
-            ] 
-        }));
-        let t1 = Rc::new(Task::Compound(CompoundTask{
+            methods: vec![] 
+        });
+        
+        let t1 = Task::Compound(CompoundTask{
             name: "t1".to_string(),
-            methods: vec![
-                Method::new(
-                    "t1_m".to_string(),
-                    HTN::new(
-                        BTreeSet::from([1, 4]),
-                        vec![],
-                        HashMap::from([
-                            (1, Rc::clone(&p1)), (4, Rc::clone(&t4))
-                        ])
-                    )
-                )
-            ] 
-        }));
+            methods: vec![] 
+        });
+        let domain = Rc::new(DomainTasks::new(vec![p1,p2,p3,p4,t1,t2,t3,t4]));
+        let t4_m = Method::new(
+            "t4_m".to_string(),
+            HTN::new(
+                BTreeSet::from([2, 3]),
+                vec![],
+                domain.clone(),
+                HashMap::from([(2, domain.get_id("p2")), (3, domain.get_id("p3"))])
+            )
+        );
+        let t3_m = Method::new(
+            "t3_m".to_string(),
+            HTN::new(
+                BTreeSet::from([1, 2]),
+                vec![(1,2)],
+                domain.clone(),
+                HashMap::from([(1, domain.get_id("p2")), (2, domain.get_id("p2"))])
+            )
+        );
+        let t2_m = Method::new(
+            "t2_m".to_string(),
+            HTN::new(
+                BTreeSet::from([4, 3]),
+                vec![(4,3)],
+                domain.clone(),
+                HashMap::from([(4, domain.get_id("p4")), (3, domain.get_id("p3"))])
+            )
+        );
+        let t1_m = Method::new(
+            "t1_m".to_string(),
+            HTN::new(
+                BTreeSet::from([1, 4]),
+                vec![],
+                domain.clone(),
+                HashMap::from([
+                    (1, domain.get_id("p1")), (4, domain.get_id("t4"))
+                ])
+            )
+        );
+        let domain = domain.add_methods(vec![(4, t1_m), (5,t2_m), (6, t3_m), (7, t4_m)]);
         let init_tn = HTN::new(
             BTreeSet::from([1,2,3]),
             vec![(1, 3), (2, 3)],
+            domain.clone(),
             HashMap::from([
-                (1, Rc::clone(&t1)), (2, Rc::clone(&t2)), (3, Rc::clone(&t3))
+                (1, domain.get_id("t1")), (2, domain.get_id("t2")), (3, domain.get_id("t3"))
             ])
-        ).collapse_tn();
-        FONDProblem {
+        );
+        let mut p = FONDProblem {
             facts: Facts::new(vec!["1".to_string(), "2".to_string(), "3".to_string(), "4".to_string()]),
-            tasks: DomainTasks::from_rc_tasks(vec![p1, p2, p3, p4, t1.clone(), t2, t3, t4]),
+            tasks: domain,
             initial_state: HashSet::new(),
             init_tn: init_tn.clone()
-        }
+        };
+        p.collapse_tn();
+        p
     }
 
     #[test]
@@ -241,8 +250,8 @@ mod tests {
         let problem = generate_problem();
         let to_classical = ToClassical::new(&problem);
         let encoded = to_classical.domain;
-        assert_eq!(encoded.facts.count(), 16);
-        assert_eq!(encoded.actions.len(), 8);
+        assert_eq!(encoded.facts.count(), 17);
+        assert_eq!(encoded.actions.len(), 9);
         for action in encoded.actions.iter() {
             let mut name = action.name.clone();
             let flag = name.ends_with("_m");
@@ -263,16 +272,17 @@ mod tests {
         let problem = generate_problem();
         let to_classical = ToClassical::new(&problem);
         let t1 = &problem.tasks.get_all_tasks().iter()
-            .filter(|x| x.get_name() == "t1").cloned().collect::<Vec<Rc<Task>>>()[0];
+            .filter(|x| x.borrow().get_name() == "t1").cloned().collect::<Vec<RefCell<Task>>>()[0];
         let state = HashSet::from([to_classical.domain.facts.get_id("1")]);
         let tn = HTN::new(
             BTreeSet::from([1]),
             vec![],
-            HashMap::from([(1, t1.clone())])
+            problem.tasks.clone(),
+            HashMap::from([(1, problem.tasks.get_id("t1"))])
         );
         let relaxed_state = to_classical.compute_relaxed_state(&tn, &state);
         assert_eq!(relaxed_state.len(), 4);
-        let names = vec!["P1_reachable", "P2_reachable", "P3_reachable", "1"];
+        let names = vec!["p1_reachable", "p2_reachable", "p3_reachable", "1"];
         for fact in relaxed_state {
             let name = to_classical.domain.facts.get_fact(fact);
             let mut is_contained = false;
@@ -291,19 +301,20 @@ mod tests {
         let to_classical = ToClassical::new(&problem);
         let all_tasks = problem.tasks.get_all_tasks();
         let t1 = &all_tasks.iter()
-            .filter(|x| x.get_name() == "t1").cloned().collect::<Vec<Rc<Task>>>()[0];
+            .filter(|x| x.borrow().get_name() == "t1").cloned().collect::<Vec<RefCell<Task>>>()[0];
         let p2 = &all_tasks.iter()
-            .filter(|x| x.get_name() == "P2").cloned().collect::<Vec<Rc<Task>>>()[0];
+            .filter(|x| x.borrow().get_name() == "p2").cloned().collect::<Vec<RefCell<Task>>>()[0];
         let state = HashSet::from([to_classical.domain.facts.get_id("1")]);
         let tn = HTN::new(
             BTreeSet::from([1, 2]),
             vec![],
-            HashMap::from([(1, t1.clone()), (2, p2.clone())])
+            problem.tasks.clone(),
+            HashMap::from([(1, problem.tasks.get_id("t1")), (2, problem.tasks.get_id("p2"))])
         );
         let goal = to_classical.compute_goal_state(&tn);
         assert_eq!(goal.len(), 2);
         let id_t1 = to_classical.domain.facts.get_id("t1");
-        let id_p2 = to_classical.domain.facts.get_id("P2");
+        let id_p2 = to_classical.domain.facts.get_id("p2");
         assert_eq!(goal.contains(&id_t1), true);
         assert_eq!(goal.contains(&id_p2), true);
     }

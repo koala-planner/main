@@ -2,37 +2,25 @@ use crate::task_network::Method;
 
 use super::*;
 use std::collections::{HashMap, HashSet};
-use std::rc::Rc;
+use std::rc::{Rc, Weak, self};
+use std::cell::RefCell;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct DomainTasks {
-    list: Vec<Rc<Task>>,
+    list: Vec<RefCell<Task>>,
     ids: HashMap<String, u32>,
 }
 
 impl DomainTasks {
     pub fn new(tasks: Vec<Task>) -> DomainTasks {
-        let mut rc_tasks = vec![];
+        let mut task_list = vec![];
         let mut ids = HashMap::new();
         for (i, task) in tasks.into_iter().enumerate() {
             ids.insert(task.get_name(), i as u32);
-            rc_tasks.push(Rc::new(task));
+            task_list.push(RefCell::new(task));
         }
         DomainTasks {
-            list: rc_tasks,
-            ids: ids,
-        }
-    }
-
-    pub fn from_rc_tasks(tasks: Vec<Rc<Task>>) -> DomainTasks {
-        let mut rc_tasks = vec![];
-        let mut ids = HashMap::new();
-        for (i, task) in tasks.into_iter().enumerate() {
-            ids.insert(task.get_name(), i as u32);
-            rc_tasks.push(task);
-        }
-        DomainTasks {
-            list: rc_tasks,
+            list: task_list,
             ids: ids,
         }
     }
@@ -41,23 +29,49 @@ impl DomainTasks {
         self.ids[task]
     }
 
-    pub fn get_task(&self, id: u32) -> Rc<Task> {
-        self.list[id as usize].clone()
+    pub fn get_task(&self, id: u32) -> &RefCell<Task> {
+        &self.list[id as usize]
     }
 
-    pub fn add_method(&mut self, id: u32, new_method: Method) {
-        let mut task = (*self.list[id as usize]).clone();
-        let name = task.get_name();
-        let mut new_methods = vec![];
-        if let Task::Compound(CompoundTask{name, mut methods}) = task {
-            new_methods = methods.clone();
-            new_methods.push(new_method);
+    pub fn count_tasks(&self) -> u32 {
+        self.list.len() as u32
+    }
+
+    pub fn add_methods(&self, methods: Vec<(u32, Method)>) -> Rc<DomainTasks> {
+        let mut new_domain = self.clone();
+        for (task_id, method) in methods {
+            let mut task = new_domain.list[task_id as usize].borrow().clone();
+            let name = task.get_name();
+            let mut new_methods = vec![];
+            if let Task::Compound(CompoundTask{name, mut methods}) = task {
+                new_methods = methods.clone();
+                new_methods.push(method);
+            } else {
+                panic!("{} is not Compound", task_id);
+            }
+            let new_task = Task::Compound(CompoundTask { name: name, methods: new_methods });
+            new_domain.list[task_id as usize] = RefCell::new(new_task);
         }
-        let new_task = Task::Compound(CompoundTask { name: name, methods: new_methods });
-        self.list[id as usize] = Rc::new(new_task);
+        let rc_domain = Rc::new(new_domain);
+        for t in rc_domain.list.iter() {
+            match &mut *t.borrow_mut() {
+                Task::Compound(CompoundTask { name, methods }) => {
+                    for m in methods.iter_mut() {
+                        m.decomposition.change_domain(rc_domain.clone());
+                    }
+                },
+                _ => {}
+            }
+        }
+        rc_domain
     }
 
-    pub fn get_all_tasks(&self) -> &Vec<Rc<Task>> {
+    pub fn add_task(&mut self, task: Task) {
+        self.ids.insert(task.get_name(), self.list.len() as u32);
+        self.list.push(RefCell::new(task));
+    }
+
+    pub fn get_all_tasks(&self) -> &Vec<RefCell<Task>>{
         &self.list
     }
 }
@@ -98,9 +112,56 @@ mod tests {
         assert_eq!(task_defs.get_id("Construct"), 2);
         assert_eq!(task_defs.get_id("PayBuilder"), 3);
 
-        assert_eq!(task_defs.get_task(0).get_name(), "ObtainPermit");
-        assert_eq!(task_defs.get_task(1).get_name(), "HireBuilder");
-        assert_eq!(task_defs.get_task(2).get_name(), "Construct");
-        assert_eq!(task_defs.get_task(3).get_name(), "PayBuilder");
+        assert_eq!(task_defs.get_task(0).borrow().get_name(), "ObtainPermit");
+        assert_eq!(task_defs.get_task(1).borrow().get_name(), "HireBuilder");
+        assert_eq!(task_defs.get_task(2).borrow().get_name(), "Construct");
+        assert_eq!(task_defs.get_task(3).borrow().get_name(), "PayBuilder");
+    }
+
+    #[test]
+    pub fn add_task_test() {
+        let empty = HashSet::new();
+        let t1 = Task::Primitive(PrimitiveAction::new(
+            "ObtainPermit".to_string(),
+            1,
+            empty.clone(),
+            vec![empty.clone()],
+            vec![empty.clone()],
+        ));
+        let t2 = Task::Primitive(PrimitiveAction::new(
+            "HireBuilder".to_string(),
+            1,
+            empty.clone(),
+            vec![empty.clone()],
+            vec![empty.clone()],
+        ));
+        let t3 = Task::Compound(CompoundTask::new("Construct".to_string(), Vec::new()));
+        let t4 = Task::Primitive(PrimitiveAction::new(
+            "PayBuilder".to_string(),
+            1,
+            empty.clone(),
+            vec![empty.clone()],
+            vec![empty.clone()],
+        ));
+        let tasks = vec![t1,t2,t3,t4];
+        let mut task_defs = DomainTasks::new(tasks);
+        let t5 = Task::Compound(CompoundTask::new("ADDED_TASK".to_string(), Vec::new()));
+        task_defs.add_task(t5);
+        assert_eq!(task_defs.get_id("ObtainPermit"), 0);
+        assert_eq!(task_defs.get_id("HireBuilder"), 1);
+        assert_eq!(task_defs.get_id("Construct"), 2);
+        assert_eq!(task_defs.get_id("PayBuilder"), 3);
+        assert_eq!(task_defs.get_id("ADDED_TASK"), 4);
+
+        assert_eq!(task_defs.get_task(0).borrow().get_name(), "ObtainPermit");
+        assert_eq!(task_defs.get_task(1).borrow().get_name(), "HireBuilder");
+        assert_eq!(task_defs.get_task(2).borrow().get_name(), "Construct");
+        assert_eq!(task_defs.get_task(3).borrow().get_name(), "PayBuilder");
+        assert_eq!(task_defs.get_task(4).borrow().get_name(), "ADDED_TASK");
+    }
+
+    #[test]
+    pub fn add_methods_test() {
+        panic!()
     }
 }
