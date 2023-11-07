@@ -14,7 +14,7 @@ impl OutcomeDeterminizer {
         // find non deterministic tasks in the domain
         let nd_actions = OutcomeDeterminizer::determinize_nd_tasks(all_tasks);
         // substitue nd tasks
-        let new_tasks = OutcomeDeterminizer::substitue_nd_tasks(all_tasks, &nd_actions);
+        let (new_tasks, bijection) = OutcomeDeterminizer::substitue_nd_tasks(all_tasks, &nd_actions);
         let new_domain = DomainTasks::new(new_tasks);
         let nd_act_map: Vec<(u32, Vec<u32>)> = nd_actions.iter().map(|(_, (c, det_acts))| {
             (new_domain.get_id(&c.get_name()),
@@ -93,7 +93,9 @@ impl OutcomeDeterminizer {
         nd_actions
     }
 
-    fn substitue_nd_tasks(all_tasks: &Vec<RefCell<Task>>, nd_actions: &HashMap<usize, (Task, Vec<Task>)>) -> Vec<Task>{
+    // returns a vector of new tasks that are all-outcome-determinized + a bijection from prev task ids to their corresponding AOD.
+    fn substitue_nd_tasks(all_tasks: &Vec<RefCell<Task>>, nd_actions: &HashMap<usize, (Task, Vec<Task>)>)
+     -> (Vec<Task>, HashMap<u32, u32>) {
         let mut new_tasks: Vec<Task> = all_tasks.iter()
                                                 .enumerate()
                                                 .filter(|(i, t)| {
@@ -109,6 +111,22 @@ impl OutcomeDeterminizer {
                                             new_tasks
                                         }).flatten()
                                         .collect::<Vec<Task>>());
+        let bijection = OutcomeDeterminizer::compute_bijection(&new_tasks, &all_tasks);
+        // Change the mappings of exisiting methods
+        for t in new_tasks.iter_mut() {
+            if let Task::Compound(CompoundTask { name, methods }) = t {
+                for m in methods.iter_mut() {
+                    for (node_id, task_id) in m.decomposition.mappings.iter_mut() {
+                        let new_task_id = *bijection.get(task_id).unwrap();
+                        *task_id = new_task_id;
+                    }
+                }
+            }
+        }
+        (new_tasks, bijection)
+    }
+
+    fn compute_bijection(new_tasks: &Vec<Task>, all_tasks: &Vec<RefCell<Task>>) -> HashMap<u32, u32> {
         let mut bijection =  HashMap::new();
         for (prev_id, prev_task) in all_tasks.iter().enumerate() {
             let borrowed_task = prev_task.borrow();
@@ -127,19 +145,9 @@ impl OutcomeDeterminizer {
             let new_id = new_tasks.iter().position(|x| x.get_name() == new_name).unwrap();
             bijection.insert(prev_id as u32, new_id as u32);
         }
-        // Change the mappings of exisiting methods
-        for t in new_tasks.iter_mut() {
-            if let Task::Compound(CompoundTask { name, methods }) = t {
-                for m in methods.iter_mut() {
-                    for (node_id, task_id) in m.decomposition.mappings.iter_mut() {
-                        let new_task_id = *bijection.get(task_id).unwrap();
-                        *task_id = new_task_id;
-                    }
-                }
-            }
-        }
-        new_tasks
+        bijection
     }
+    
 }
 
 #[cfg(test)]

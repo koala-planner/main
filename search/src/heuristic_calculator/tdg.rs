@@ -104,7 +104,7 @@ impl TDG  {
     }
 
     // compute all reachable tasks from an HTN
-    pub fn reachable_from_tn<'a>(&'a self, tn: &'a HTN) -> BTreeSet<u32> {
+    pub fn reachable_from_tn(&self, tn: &HTN) -> BTreeSet<u32> {
         let mut reachables = BTreeSet::new();
         for task in tn.get_all_tasks().iter() {
             reachables.extend(self.all_reachables(*task));
