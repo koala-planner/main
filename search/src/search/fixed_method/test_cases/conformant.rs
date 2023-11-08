@@ -10,7 +10,6 @@ use super::{AOStarSearch, FONDProblem};
 #[test]
 pub fn conformant_test() {
     use std::collections::BTreeSet;
-
     use crate::domain_description::{Facts, DomainTasks};
 
     let p1 = Task::Primitive(PrimitiveAction::new(

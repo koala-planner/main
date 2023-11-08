@@ -1,4 +1,4 @@
-use std::{collections::{HashSet, BTreeSet}, rc::Rc, cell::RefCell};
+use std::{collections::{HashSet, BTreeSet, HashMap}, rc::Rc, cell::RefCell};
 use crate::{task_network::Applicability, relaxation::ToClassical};
 use crate::heuristic_calculator::FF;
 use super::{HTN, PrimitiveAction, Task, CompoundTask};
@@ -13,9 +13,15 @@ impl SearchNode {
         SearchNode { state, tn }
     }
     
-    pub fn compute_heuristic_value(&self, encoder: &ToClassical) -> f32 {
-        let relaxed_state = encoder.compute_relaxed_state(&self.tn, self.state.as_ref());
-        let goal_state = encoder.compute_goal_state(&self.tn);
+    pub fn compute_heuristic_value(&self, encoder: &ToClassical, bijection: &HashMap<u32, u32>) -> f32 {
+        let task_ids = self.tn.get_all_task_mappings().iter().map(|x| {
+            *bijection.get(x).unwrap()
+        }).collect();
+        let relaxed_state = encoder.compute_relaxed_state(
+            &task_ids,
+            self.state.as_ref()
+        );
+        let goal_state = encoder.compute_goal_state(&task_ids);
         FF::calculate_h(&encoder.domain, &relaxed_state, &goal_state)
     }
 

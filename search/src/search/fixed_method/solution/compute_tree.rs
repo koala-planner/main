@@ -19,7 +19,7 @@ pub struct ComputeTree {
     pub root: u32,
     // Keeps teack of maximum u32 ID used in the tree
     pub cursor: u32,
-    relaxed_domain: Option<ToClassical>,
+    relaxed_domain: Option<(ToClassical, HashMap<u32, u32>)>,
 }
 
 impl ComputeTree  {
@@ -34,13 +34,13 @@ impl ComputeTree  {
             cost: 0.0,
             status: NodeStatus::OnGoing,
         };
-        let outcome_det = OutcomeDeterminizer::htn(&problem);
+        let (outcome_det, bijection) = OutcomeDeterminizer::from_fond_problem(&problem);
         let relaxed = ToClassical::new(&outcome_det);
         ComputeTree {
             ids: HashMap::from([(1, RefCell::new(compute_node))]),
             root: 1,
             cursor: 2,
-            relaxed_domain: Some(relaxed),
+            relaxed_domain: Some((relaxed, bijection)),
         }
     }
 
@@ -149,33 +149,29 @@ impl ComputeTree  {
         let expansions: Vec<(Vec<ComputeTreeNode>, ConnectionLabel)> = node_successors
             .into_iter()
             .map(|x| {
-                (
-                    x.items
-                        .into_iter()
-                        .map(|y| {
-                            let mut h = 0.0;
-                            if self.relaxed_domain.is_some() {
-                                h = y.compute_heuristic_value(self.relaxed_domain.as_ref().unwrap());
-                            }
-                            let mut child_label = NodeStatus::OnGoing;
-                            if h == f32::INFINITY {
-                                child_label = NodeStatus::Failed;
-                            } else if y.is_goal(){
-                                child_label = NodeStatus::Solved;
-                            }
-                            ComputeTreeNode {
-                                parent_id: Some(id),
-                                search_node: y,
-                                connections: None,
-                                cost: h,
-                                status: child_label,
-                            }
-                        })
-                        .collect::<Vec<ComputeTreeNode>>(),
-                    x.connection_label,
-                )
-            })
-            .collect();
+                (x.items.into_iter().map(|y| {
+                    let mut h = 0.0;
+                    if self.relaxed_domain.is_some() {
+                        h = y.compute_heuristic_value(
+                            &self.relaxed_domain.as_ref().unwrap().0,
+                                    &self.relaxed_domain.as_ref().unwrap().1
+                            );
+                    }
+                    let mut child_label = NodeStatus::OnGoing;
+                    if h == f32::INFINITY {
+                        child_label = NodeStatus::Failed;
+                    } else if y.is_goal(){
+                        child_label = NodeStatus::Solved;
+                    }
+                    ComputeTreeNode {
+                        parent_id: Some(id),
+                        search_node: y,
+                        connections: None,
+                        cost: h,
+                        status: child_label,
+                    }
+                }).collect::<Vec<ComputeTreeNode>>(), x.connection_label)
+            }).collect();
         let mut node_connections = vec![];
         for (expansion_nodes, action_type) in expansions.into_iter() {
             let mut children_id = HashSet::new();

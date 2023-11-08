@@ -5,7 +5,9 @@ use std::{rc::{Rc, self}, collections::{HashSet, HashMap, BTreeSet}, ops::Index,
 pub struct OutcomeDeterminizer {}
 
 impl OutcomeDeterminizer {
-    pub fn htn(problem: &FONDProblem) -> FONDProblem {
+    // returns an all outcome determinization of a problem along with a task id mapping from previous domain
+    // to the new one
+    pub fn from_fond_problem(problem: &FONDProblem) -> (FONDProblem, HashMap<u32, u32>) {
         // We assume a collapsed network (i.e., with only one init abstract task)
         if problem.init_tn.count_tasks() > 1 {
             panic!("tn not in collapsed format")
@@ -34,12 +36,12 @@ impl OutcomeDeterminizer {
             rc_domain.clone(),
             HashMap::from([(1, new_top_id)])
         );
-        FONDProblem { 
+        (FONDProblem { 
             facts: problem.facts.clone(),
             tasks: rc_domain,
             initial_state: problem.initial_state.clone(),
             init_tn: new_tn
-        }
+        }, bijection)
     }
 
     // Converts a primitive task to an abstract one with several
@@ -210,7 +212,12 @@ mod tests {
             init_tn: tn
         };
         problem.collapse_tn();
-        let relaxed = OutcomeDeterminizer::htn(&problem);
+        let (relaxed, bijection) = OutcomeDeterminizer::from_fond_problem(&problem);
+        assert_eq!(bijection.len(), 5);
+        assert_eq!(*bijection.get(&domain.get_id("p1")).unwrap(), relaxed.tasks.get_id("p1"));
+        assert_eq!(*bijection.get(&domain.get_id("p2")).unwrap(), relaxed.tasks.get_id("p2__determinized"));
+        assert_eq!(*bijection.get(&domain.get_id("p3")).unwrap(), relaxed.tasks.get_id("p3"));
+        assert_eq!(*bijection.get(&domain.get_id("t1")).unwrap(), relaxed.tasks.get_id("t1"));
         assert_eq!(relaxed.facts.count(), problem.facts.count());
         let new_tasks: Vec<String> = relaxed.tasks.get_all_tasks().iter()
                                         .map(|x| x.borrow().get_name())

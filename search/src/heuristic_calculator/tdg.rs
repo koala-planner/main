@@ -68,14 +68,12 @@ impl TDG  {
     }
 
     // Checks whether "task" can be reached from the current network
-    pub fn is_reachable(&self, task: &RefCell<Task>) -> bool {
-        let id = self.domain.get_id(&task.borrow().get_name());
+    pub fn is_reachable(&self, id: u32) -> bool {
         self.task_vertices.contains_key(&id)
     }
 
     // compute all reachable tasks from "task"
-    pub fn all_reachables(&self, task: &RefCell<Task>) -> BTreeSet<u32> {
-        let task_id = self.domain.get_id(&task.borrow().get_name());
+    pub fn task_reachability(&self, task_id: u32) -> BTreeSet<u32> {
         let mut working_set = LinkedList::from([task_id]);
         let mut result = BTreeSet::from([task_id]);
         while !working_set.is_empty() {
@@ -104,10 +102,10 @@ impl TDG  {
     }
 
     // compute all reachable tasks from an HTN
-    pub fn reachable_from_tn(&self, tn: &HTN) -> BTreeSet<u32> {
+    pub fn all_reachables(&self, task_ids: &Vec<u32>) -> BTreeSet<u32> {
         let mut reachables = BTreeSet::new();
-        for task in tn.get_all_tasks().iter() {
-            reachables.extend(self.all_reachables(*task));
+        for task in task_ids.iter() {
+            reachables.extend(self.task_reachability(*task));
         }
         reachables
     }
@@ -284,15 +282,15 @@ mod tests {
         problem.collapse_tn();
 
         let tdg = TDG::new(&problem.init_tn);
-        assert_eq!(tdg.is_reachable(domain.get_task(domain.get_id("p1"))), true);
-        assert_eq!(tdg.is_reachable(domain.get_task(domain.get_id("t4"))), true);
-        assert_eq!(tdg.is_reachable(domain.get_task(domain.get_id("unreach"))), false);
-        assert_eq!(tdg.is_reachable(domain.get_task(domain.get_id("unreach_t"))), false);
-        assert_eq!(tdg.all_reachables(domain.get_task(domain.get_id("p1"))).len(), 1);
-        assert_eq!(tdg.all_reachables(domain.get_task(domain.get_id("p2"))).len(), 1);
-        assert_eq!(tdg.all_reachables(domain.get_task(domain.get_id("p3"))).len(), 1);
-        assert_eq!(tdg.all_reachables(domain.get_task(domain.get_id("p4"))).len(), 1);
-        assert_eq!(tdg.all_reachables(domain.get_task(domain.get_id("t2"))).len(), 3);
+        assert_eq!(tdg.is_reachable(domain.get_id("p1")), true);
+        assert_eq!(tdg.is_reachable(domain.get_id("t4")), true);
+        assert_eq!(tdg.is_reachable(domain.get_id("unreach")), false);
+        assert_eq!(tdg.is_reachable(domain.get_id("unreach_t")), false);
+        assert_eq!(tdg.task_reachability(domain.get_id("p1")).len(), 1);
+        assert_eq!(tdg.task_reachability(domain.get_id("p2")).len(), 1);
+        assert_eq!(tdg.task_reachability(domain.get_id("p3")).len(), 1);
+        assert_eq!(tdg.task_reachability(domain.get_id("p4")).len(), 1);
+        assert_eq!(tdg.task_reachability(domain.get_id("t2")).len(), 3);
         let new_tn = HTN::new(
             BTreeSet::from([1]),
             vec![],
@@ -308,12 +306,12 @@ mod tests {
         problem2.collapse_tn();
 
         let tdg = TDG::new(&problem2.init_tn);
-        assert_eq!(tdg.is_reachable(domain.get_task(domain.get_id("p3"))), true);
-        assert_eq!(tdg.is_reachable(domain.get_task(domain.get_id("p2"))), true);
-        assert_eq!(tdg.is_reachable(domain.get_task(domain.get_id("p4"))), false);
-        assert_eq!(tdg.is_reachable(domain.get_task(domain.get_id("t1"))), true);
-        assert_eq!(tdg.is_reachable(domain.get_task(domain.get_id("t4"))), true);
-        let reachables_t4 = tdg.all_reachables(domain.get_task(domain.get_id("t4")));
+        assert_eq!(tdg.is_reachable(domain.get_id("p3")), true);
+        assert_eq!(tdg.is_reachable(domain.get_id("p2")), true);
+        assert_eq!(tdg.is_reachable(domain.get_id("p4")), false);
+        assert_eq!(tdg.is_reachable(domain.get_id("t1")), true);
+        assert_eq!(tdg.is_reachable(domain.get_id("t4")), true);
+        let reachables_t4 = tdg.task_reachability(domain.get_id("t4"));
         assert_eq!(reachables_t4.len(), 3);
         assert_eq!(reachables_t4.contains(&domain.get_id("p3")), true);
         assert_eq!(reachables_t4.contains(&domain.get_id("p2")), true);
@@ -392,8 +390,17 @@ mod tests {
                 x.borrow().get_name() == "p1"
             }).collect::<Vec<_>>()[0].1;
             let new_tn = new_tn.apply_action(p1_id);
-            let result = tdg.reachable_from_tn(&new_tn);
+            let task_ids: Vec<_> = new_tn.get_all_task_mappings();
+            let result = tdg.all_reachables(&task_ids);
+            let result: Vec<_> = result.iter()
+                                        .map(|x| domain.get_task(*x).borrow().get_name())
+                                        .collect();
             assert_eq!(result.len(), 5);
+            assert_eq!(result.contains(&format!("p2")), true);
+            assert_eq!(result.contains(&format!("t1")), true);
+            assert_eq!(result.contains(&format!("t4")), true);
+            assert_eq!(result.contains(&format!("p1")), true);
+            assert_eq!(result.contains(&format!("p3")), true);
         };
     }
 }

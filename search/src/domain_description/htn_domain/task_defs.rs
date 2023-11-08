@@ -78,6 +78,8 @@ impl DomainTasks {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeSet;
+
     use super::*;
 
     #[test]
@@ -162,6 +164,80 @@ mod tests {
 
     #[test]
     pub fn add_methods_test() {
-        panic!()
+        let empty = HashSet::new();
+        let t1 = Task::Primitive(PrimitiveAction::new(
+            "ObtainPermit".to_string(),
+            1,
+            empty.clone(),
+            vec![empty.clone()],
+            vec![empty.clone()],
+        ));
+        let t2 = Task::Primitive(PrimitiveAction::new(
+            "HireBuilder".to_string(),
+            1,
+            empty.clone(),
+            vec![empty.clone()],
+            vec![empty.clone()],
+        ));
+        let t3 = Task::Compound(CompoundTask::new("Construct".to_string(), Vec::new()));
+        let t4 = Task::Primitive(PrimitiveAction::new(
+            "PayBuilder".to_string(),
+            1,
+            empty.clone(),
+            vec![empty.clone()],
+            vec![empty.clone()],
+        ));
+        let t5 = Task::Compound(CompoundTask::new("abstract_t".to_string(), Vec::new()));
+        let tasks = vec![t1,t2,t3,t4,t5];
+        let task_defs = Rc::new(DomainTasks::new(tasks));
+        let t3_m = Method::new(format!("t3_m"), HTN::new(
+            BTreeSet::from([1,2]), vec![(1,2)], task_defs.clone(), 
+            HashMap::from([(1, 0), (2, 2)]))
+        );
+        let t5_m1 = Method::new(format!("t5_m1"), HTN::new(
+            BTreeSet::from([1]), vec![], task_defs.clone(), 
+            HashMap::from([(1, 4)]))
+        );
+        let t5_m2 = Method::new(format!("t5_m2"), HTN::new(
+            BTreeSet::from([1]), vec![], task_defs.clone(), 
+            HashMap::from([(1, 1)]))
+        );
+        let task_defs = task_defs.add_methods(vec![(2, t3_m), (4, t5_m1), (4, t5_m2)]); 
+        assert_eq!(task_defs.get_id("ObtainPermit"), 0);
+        assert_eq!(task_defs.get_id("HireBuilder"), 1);
+        assert_eq!(task_defs.get_id("Construct"), 2);
+        assert_eq!(task_defs.get_id("PayBuilder"), 3);
+        assert_eq!(task_defs.get_id("abstract_t"), 4);
+
+        match &*task_defs.get_task(2).borrow() {
+            Task::Compound(CompoundTask { name, methods }) => {
+                assert_eq!(methods.len(), 1);
+                let m = &methods[0];
+                assert_eq!(m.decomposition.get_nodes().len(), 2);
+                assert_eq!(m.decomposition.get_task(1).borrow().get_name(), String::from("ObtainPermit"));
+                assert_eq!(m.decomposition.get_task(2).borrow().get_name(), String::from("Construct"));
+            },
+            _ => panic!("task is not compound")
+        }
+
+        match &*task_defs.get_task(4).borrow() {
+            Task::Compound(CompoundTask { name, methods }) => {
+                assert_eq!(methods.len(), 2);
+                let m1 = &methods[0];
+                assert_eq!(m1.decomposition.get_nodes().len(), 1);
+                assert_eq!(m1.decomposition.get_task(1).borrow().get_name(), String::from("abstract_t"));
+
+                let m2 = &methods[1];
+                assert_eq!(m2.decomposition.get_nodes().len(), 1);
+                assert_eq!(m2.decomposition.get_task(1).borrow().get_name(), String::from("HireBuilder"));
+            },
+            _ => panic!("task is not compound")
+        }
+
+        assert_eq!(task_defs.get_task(0).borrow().get_name(), "ObtainPermit");
+        assert_eq!(task_defs.get_task(1).borrow().get_name(), "HireBuilder");
+        assert_eq!(task_defs.get_task(2).borrow().get_name(), "Construct");
+        assert_eq!(task_defs.get_task(3).borrow().get_name(), "PayBuilder");
+        assert_eq!(task_defs.get_task(4).borrow().get_name(), "abstract_t");
     }
 }

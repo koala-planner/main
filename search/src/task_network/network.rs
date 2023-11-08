@@ -140,6 +140,12 @@ impl HTN {
         HTN { network: subgraph, domain: tn.domain.clone(), mappings: new_mappings }
     }
 
+    pub fn get_all_task_mappings(&self) -> Vec<u32>{
+        self.mappings.iter().map(|(node, task)| {
+            *task
+        }).collect()
+    }
+
     // pub fn is_isomorphic(tn1: &HTN, tn2: &HTN) -> bool {
     //     let layers_1 = tn1.network.to_layers();
     //     let layers_2 = tn2.network.to_layers();

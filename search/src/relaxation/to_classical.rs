@@ -10,7 +10,7 @@ use regex::Regex;
 #[derive(Debug)]
 pub struct ToClassical{
     tdg: TDG,
-    original_tasks: Rc<DomainTasks>,
+    htn_tasks: Rc<DomainTasks>,
     pub domain: ClassicalDomain,
 }
 
@@ -31,7 +31,7 @@ impl ToClassical  {
         let new_actions = ToClassical::encode(&domain, &new_facts);
         let classic_domain = ClassicalDomain { facts: new_facts, actions: new_actions };
         let tdg = TDG::new(&domain.init_tn);
-        ToClassical { domain: classic_domain, original_tasks: domain.tasks.clone(), tdg: tdg }
+        ToClassical { domain: classic_domain, htn_tasks: domain.tasks.clone(), tdg: tdg }
     }
 
     fn encode(domain: &FONDProblem, facts: &Facts) -> Vec<PrimitiveAction> {
@@ -91,11 +91,11 @@ impl ToClassical  {
         result
     }
 
-    pub fn compute_relaxed_state(&self, tn: &HTN, state: &HashSet<u32>) -> HashSet<u32> {
-        let reachables = self.tdg.reachable_from_tn(tn);
+    pub fn compute_relaxed_state(&self, task_ids: &Vec<u32>, state: &HashSet<u32>) -> HashSet<u32> {
+        let reachables = self.tdg.all_reachables(task_ids);
         let mut satisfied_preconds = HashSet::new();
         for task in reachables.iter() {
-            let task = self.original_tasks.get_task(*task);
+            let task = self.htn_tasks.get_task(*task);
             if let Task::Primitive(prim) = &*task.borrow() {
                 let mut fact_name = prim.name.clone();
                 if !prim.is_deterministic() {
@@ -117,15 +117,10 @@ impl ToClassical  {
         satisfied_preconds     
     }
 
-    pub fn compute_goal_state(&self, tn: &HTN) -> HashSet<u32> {
+    pub fn compute_goal_state(&self, task_ids: &Vec<u32>) -> HashSet<u32> {
         let mut goal = HashSet::new();
-        for task in tn.get_all_tasks().iter() {
-            let mut name = task.borrow().get_name();
-            if let Task::Primitive(p) = &*task.borrow() {
-                if !p.is_deterministic() {
-                    name += "__determinized";
-                }
-            };
+        for task in task_ids {
+            let mut name = self.htn_tasks.get_task(*task).borrow().get_name();
             let g = self.domain.facts.get_id(&name);
             goal.insert(g);
         }
@@ -279,7 +274,7 @@ mod tests {
             problem.tasks.clone(),
             HashMap::from([(1, problem.tasks.get_id("t1"))])
         );
-        let relaxed_state = to_classical.compute_relaxed_state(&tn, &state);
+        let relaxed_state = to_classical.compute_relaxed_state(&vec![problem.tasks.get_id("t1"),], &state);
         assert_eq!(relaxed_state.len(), 4);
         let names = vec!["p1_reachable", "p2_reachable", "p3_reachable", "1"];
         for fact in relaxed_state {
@@ -310,7 +305,9 @@ mod tests {
             problem.tasks.clone(),
             HashMap::from([(1, problem.tasks.get_id("t1")), (2, problem.tasks.get_id("p2"))])
         );
-        let goal = to_classical.compute_goal_state(&tn);
+        let goal = to_classical.compute_goal_state(&vec![
+            problem.tasks.get_id("t1"), problem.tasks.get_id("p2")
+        ]);
         assert_eq!(goal.len(), 2);
         let id_t1 = to_classical.domain.facts.get_id("t1");
         let id_p2 = to_classical.domain.facts.get_id("p2");
