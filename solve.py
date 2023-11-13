@@ -29,7 +29,7 @@ def solve(domain, problem):
         ["python3", serilazer_path + "htn_parser.py",
          serilazer_path + "result.ground", planner_path + "result.json"],
         capture_output=False)
-    # os.remove(serilazer_path + "result.ground")
+    os.remove(serilazer_path + "result.ground")
     print("<<<<<<<<<< Conversion to JSON Complete >>>>>>>>>>")
     # Search
     print("<<<<<<<<<< Starting Search >>>>>>>>>>")

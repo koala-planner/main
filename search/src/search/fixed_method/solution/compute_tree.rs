@@ -154,7 +154,7 @@ impl ComputeTree  {
                     if self.relaxed_domain.is_some() {
                         h = y.compute_heuristic_value(
                             &self.relaxed_domain.as_ref().unwrap().0,
-                                    &self.relaxed_domain.as_ref().unwrap().1
+                            &self.relaxed_domain.as_ref().unwrap().1
                             );
                     }
                     let mut child_label = NodeStatus::OnGoing;

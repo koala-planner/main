@@ -74,6 +74,11 @@ impl DomainTasks {
     pub fn get_all_tasks(&self) -> &Vec<RefCell<Task>>{
         &self.list
     }
+
+    pub fn contains(&self, id: u32) -> bool {
+        let n_tasks = self.list.len() as u32;
+        id < n_tasks
+    }
 }
 
 #[cfg(test)]

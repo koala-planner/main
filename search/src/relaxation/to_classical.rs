@@ -125,6 +125,10 @@ impl ToClassical  {
             goal.insert(g);
         }
         goal
+    }
+
+    pub fn print_tdg(&self) {
+        println!("{}", self.tdg)
     } 
 }
 

@@ -10,7 +10,7 @@ pub struct TDG{
     domain: Rc<DomainTasks>,
     root: u32,
     task_vertices: HashMap<u32, Option<Vec<String>>>,
-    method_vertices: HashMap<String, Vec<u32>>
+    method_vertices: HashMap<String, BTreeSet<u32>>
 }
 
 impl TDG  {
@@ -38,7 +38,7 @@ impl TDG  {
                             for (i, method) in compound.methods.iter().enumerate() {
                                 let name = format!("task{}_m{}", task_id, i);
                                 let subtasks = method.decomposition.get_all_tasks();
-                                let subtasks: Vec<u32> = subtasks.iter().map(|x| {
+                                let subtasks: BTreeSet<u32> = subtasks.iter().map(|x| {
                                     domain.get_id(&x.borrow().get_name())
                                 }).collect();
                                 method_vertices.insert(name.clone(),subtasks.clone());
@@ -75,6 +75,7 @@ impl TDG  {
     // compute all reachable tasks from "task"
     pub fn task_reachability(&self, task_id: u32) -> BTreeSet<u32> {
         let mut working_set = LinkedList::from([task_id]);
+        let mut visited_set = BTreeSet::from([task_id]);
         let mut result = BTreeSet::from([task_id]);
         while !working_set.is_empty() {
             let current = working_set.pop_front().unwrap();
@@ -85,12 +86,17 @@ impl TDG  {
                             for method in method_names.iter() {
                                 let new_tasks = self.method_vertices.get(method).unwrap();
                                 for new_task in new_tasks.iter() {
-                                    working_set.push_back(*new_task);
-                                    result.insert(*new_task);
+                                    if !visited_set.contains(new_task) {
+                                        working_set.push_back(*new_task);
+                                        result.insert(*new_task);
+                                        visited_set.insert(*new_task);
+                                    }
                                 }
                             }
                         },
                         None => {
+                            // we don't have to include this in visited set because
+                            // if a node does not have any edges, it cannot be recursively called
                             result.insert(current);
                         }
                     }
@@ -101,11 +107,15 @@ impl TDG  {
         result
     }
 
-    // compute all reachable tasks from an HTN
+    // compute all reachable tasks from a vector of task ids in the domain
     pub fn all_reachables(&self, task_ids: &Vec<u32>) -> BTreeSet<u32> {
         let mut reachables = BTreeSet::new();
         for task in task_ids.iter() {
-            reachables.extend(self.task_reachability(*task));
+            if self.domain.contains(*task){
+                reachables.extend(self.task_reachability(*task));
+            } else {
+                panic!("Task not in the domain")
+            }
         }
         reachables
     }
@@ -402,5 +412,35 @@ mod tests {
             assert_eq!(result.contains(&format!("p1")), true);
             assert_eq!(result.contains(&format!("p3")), true);
         };
+    }
+
+    #[test]
+    pub fn cyclic_task_test() {
+        let t1 = Task::Compound(CompoundTask{
+            name: "t1".to_string(),
+            methods: vec![] 
+        });
+        let domain = Rc::new(DomainTasks::new(vec![t1]));
+        let t1_m = Method::new(
+            "t1_m".to_string(),
+            HTN::new(
+                BTreeSet::from([1, 2]),
+                vec![],
+                domain.clone(),
+                HashMap::from([(1, domain.get_id("t1")), (2, domain.get_id("t1"))])
+            )
+        );
+        let domain = domain.add_methods(vec![(0, t1_m)]);
+        let init_tn = HTN::new(
+            BTreeSet::from([1]), 
+            vec![], 
+            domain.clone(), 
+            HashMap::from([(1, 0)])
+        );
+        let tdg = TDG::new(&init_tn);
+        println!("{}", tdg);
+        let mut reachables = tdg.all_reachables(&vec![0]);
+        assert_eq!(reachables.len(), 1);
+        assert_eq!(domain.get_task(reachables.pop_last().unwrap()).borrow().get_name(), format!("t1"));
     }
 }

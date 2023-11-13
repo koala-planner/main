@@ -230,26 +230,19 @@ impl HTN {
     
 }
 
-// impl  fmt::Display for HTN {
-//     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
-//         let layers = self.network.to_layers();
-//         let layers = self.layers_to_tasks(layers);
-//         for (i, layer) in layers.iter().enumerate() {
-//             write!(f, "layer {}:\n", i);
-//             for task in layer.iter() {
-//                 write!(f, "\t{}", task);
-//                 if let Task::Compound(CompoundTask { name: _, methods }) = task {
-//                     for method in methods.iter() {
-//                         write!(f, "\t\t(M) {}\n", method.name);
-//                     }
-//                 } else {
-//                     write!(f, "\n");
-//                 }
-//             }
-//         }
-//         Ok(())
-//      }
-// }
+impl fmt::Display for HTN {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        writeln!(f, "digraph g {{");
+        for node in self.get_nodes().iter() {
+            writeln!(f, "\t{} [label={}];", *node, self.get_task(*node).borrow().get_name());
+        }
+        for (i,j) in self.network.get_edges() {
+            writeln!(f, "\t{}->{};", i, j);
+        }
+        writeln!(f, "}}");
+        Ok(())
+     }
+}
 
 #[cfg(test)]
 mod tests {
