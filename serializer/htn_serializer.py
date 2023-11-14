@@ -21,7 +21,6 @@ class HTNSerializer:
             processed_sections[group_name] = [x for x in group_val if x != ""]
         processed_sections["tasks"] = processed_sections.pop("tasks__primitive_and_abstract")
         self.serialized = processed_sections
-    # TODO: Complete this
     # Process Actions
     def process_actions(self):
         raw_actions = self.serialized["actions"]
@@ -36,7 +35,6 @@ class HTNSerializer:
             action["del_eff"] = self.process_effects(raw_actions[i+3])
             processed_actions[self.serialized["tasks"][i//4]] = action
         self.serialized["actions"] = processed_actions
-    # TODO: Complete this 
     # TODO: investigate what _splitting_method is in the output
     # Process methods
     def process_methods(self):

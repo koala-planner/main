@@ -11,22 +11,24 @@ class FONDMerger:
         return self.domain
     # get a mapping from nd action name to its number of effects
     def _extract_numbers(self):
-        nd_methods = [x for x in self.domain["methods"] if x.startswith("fond_act__")]
-        method_actions = [x[10:].rstrip(string.digits) for x in nd_methods]
-        zipped_methods = [(x,y) for x, y in zip(nd_methods, method_actions)]
-        uniq_action_names = set(method_actions)
-        number_of_effects = {k: 0 for k in uniq_action_names}
-        for _, nd_act in zipped_methods:
-            number_of_effects[nd_act] += 1
-        return number_of_effects
+        nd_methods = [self.domain["methods"][x] for x in self.domain["methods"] if x.startswith("fond_act__")]
+        grouped_nd_methods = {}
+        for m in nd_methods:
+            task_name = m["task"]
+            if task_name in grouped_nd_methods.keys():
+                grouped_nd_methods[task_name] += 1
+            else:
+                grouped_nd_methods[task_name] = 1
+        return grouped_nd_methods
     # get a mapping from preprocessed nd action name to its original one
     def _nd_translator(self):
         if self._translator_cache == None:
             action_count = self._extract_numbers()
             translator = {}
             for action, count in action_count.items():
+                splitted_name = action.split("[")
                 for i in range(count):
-                    translator["fond_act__" + action + str(i)] = action
+                    translator["fond_act__"  + splitted_name[0] + str(i) + "[" + splitted_name[1] ] = action
             self._translator_cache = translator
             return translator
         else:
@@ -37,8 +39,7 @@ class FONDMerger:
         to_be_removed = set()
         for action_name in self.domain["actions"]:
             if action_name.startswith("fond_act__"):
-                splited_name = action_name.split('[')
-                translated_name = translator[splited_name[0]] + '[' + splited_name[1]
+                translated_name = translator[action_name]
                 action = self.domain["actions"][action_name]
                 if translated_name in nd_actions:
                     eff = {}
