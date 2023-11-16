@@ -30,14 +30,12 @@ impl ComputeTree  {
         // relaxed domain
         let (outcome_det, bijection) = OutcomeDeterminizer::from_fond_problem(&problem);
         let relaxed = ToClassical::new(&outcome_det);
-        // initial h-val
-        let h = search_node.compute_heuristic_value(&relaxed, &bijection);
         // initial node
         let compute_node = ComputeTreeNode {
             parent_id: None,
             search_node,
             connections: None,
-            cost: h,
+            cost: 0.0,
             status: NodeStatus::OnGoing,
         };
         // compute tree

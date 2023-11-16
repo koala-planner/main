@@ -16,12 +16,73 @@ impl FF {
         );
         match graphplan {
             Some(graph) => {
-                return graph.depth as f32
+                return FF::plan_length(domain, graph, goal) as f32
             },
             None => {
                 return f32::INFINITY;
             }
         }
+    }
+
+    fn plan_length(domain: &ClassicalDomain, graphplan: GraphPlan, goal_state: &HashSet<u32>) -> u32 {
+        let mut len = 0;
+        let mut G = graphplan.compute_goal_indices(goal_state);
+        let mut marks = HashMap::new();
+        for i in 0..graphplan.depth + 1 {
+            marks.insert(i, HashSet::new());
+        }
+        for i in (1..graphplan.depth + 1).rev() {
+            if G.get(&i).is_none() {
+                continue;
+            }
+            let open_goals: HashSet<u32> = G.get(&i).unwrap().difference(marks.get(&i).unwrap()).cloned().collect();
+            for open_goal in open_goals.iter() {
+                let actions = graphplan.get_action_layer(i-1);
+                let mut actions = domain.get_actions_by_index(actions);
+                // select only actions that produce this goal
+                actions = actions.iter().filter(|x|{
+                    if x.add_effects.len() > 1 {
+                        panic!("actions are not determinized")
+                    }
+                    x.add_effects[0].contains(open_goal)
+                }).map(|x| *x).collect();
+                //select min cost action
+                let min_action = *actions.iter().reduce(|acc, e| {
+                    if acc.cost > e.cost {
+                        e
+                    } else {
+                        acc
+                    }
+                }).unwrap();
+                len += min_action.cost;
+                // add preconds as new goals
+                // // not satisifed at the initial state
+                let mut open_preconds: HashSet<u32> = min_action.pre_cond.difference(&graphplan.get_fact_layer(0)).cloned().collect();
+                // // not satisfied by action
+                open_preconds = open_preconds.difference(marks.get(&(i-1)).unwrap()).cloned().collect();
+                // add open preconds to their corresponding layer 
+                for precond in open_preconds.iter() {
+                    let membership_layer = graphplan.facts.get(&precond).unwrap();
+                    match G.get_mut(membership_layer) {
+                        Some(set) => {
+                            set.insert(precond.clone());
+                        },
+                        None => {
+                            G.insert(*membership_layer, HashSet::from([*precond]));
+                        }
+                    }
+                }
+                for add in min_action.add_effects[0].iter() {
+                    if let Some(set) = marks.get_mut(&i) {
+                        set.insert(add.clone());
+                    }
+                    if let Some(set) = marks.get_mut(&(i-1)) {
+                        set.insert(add.clone());
+                    }
+                }
+            }
+        }
+        len
     }
 }
 
