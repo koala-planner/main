@@ -36,14 +36,6 @@ impl<'a> GraphPlan <'a>{
         while !GraphPlan::all_goals_satisfied(&fact_membership, goal) {
             // no new facts have been generated
             if layer_facts.len() == 0 {
-                // let actions = HashMap::from(
-                //     action_membership
-                //     .iter()
-                //     .map(|(k,(c, i))| (k.clone(),i.clone()))
-                //     .collect::<HashMap<usize, u32>>()
-                // );
-                // println!("{}",
-                // GraphPlan { actions: actions, facts: fact_membership, depth: layer_num, domain: domain});
                 return None;
             }
             layer_num += 1;

@@ -27,15 +27,20 @@ impl ComputeTree  {
         let initial_tn = problem.init_tn.clone();
         let search_node =
             SearchNode::new(Rc::new(problem.initial_state.clone()), Rc::new(initial_tn));
+        // relaxed domain
+        let (outcome_det, bijection) = OutcomeDeterminizer::from_fond_problem(&problem);
+        let relaxed = ToClassical::new(&outcome_det);
+        // initial h-val
+        let h = search_node.compute_heuristic_value(&relaxed, &bijection);
+        // initial node
         let compute_node = ComputeTreeNode {
             parent_id: None,
             search_node,
             connections: None,
-            cost: 0.0,
+            cost: h,
             status: NodeStatus::OnGoing,
         };
-        let (outcome_det, bijection) = OutcomeDeterminizer::from_fond_problem(&problem);
-        let relaxed = ToClassical::new(&outcome_det);
+        // compute tree
         ComputeTree {
             ids: HashMap::from([(1, RefCell::new(compute_node))]),
             root: 1,
