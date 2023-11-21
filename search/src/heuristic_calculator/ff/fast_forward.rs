@@ -54,7 +54,7 @@ impl FF {
                         acc
                     }
                 }).unwrap();
-                len += min_action.cost;
+                len += 1;
                 // add preconds as new goals
                 // // not satisifed at the initial state
                 let mut open_preconds: HashSet<u32> = min_action.pre_cond.difference(&graphplan.get_fact_layer(0)).cloned().collect();

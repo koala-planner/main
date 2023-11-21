@@ -67,19 +67,10 @@ class FONDMerger:
         for key in nd_actions:
             self.domain["actions"][key] = nd_actions[key] 
     def remove_redundancies(self):
-        # remove abstract tasks
-        nd_actions = [x + '[' for x, _ in self._extract_numbers().items()]
-        tasks = self.domain["tasks"]["abstract"]
-        new_tasks = []
-        for name in tasks:
-            to_add = 1
-            for pattern in nd_actions:
-                if name.startswith(pattern):
-                    to_add = 0
-                    break
-            if to_add:
-                new_tasks.append(name)
-        self.domain["tasks"] = new_tasks
+        # remove FOND abstract tasks
+        nd_actions = list(self._extract_numbers().keys())
+        filtered_tasks = list(filter(lambda x: (x not in nd_actions), self.domain["tasks"]["abstract"]))
+        self.domain["tasks"] = filtered_tasks
         # remove added methods
         nd_methods = [x for x in self.domain["methods"] if x.startswith("fond_act__")]
         nd_method_preconds = [x for x in self.domain["actions"] if x.startswith("__method_precondition_fond_act__")]

@@ -34,4 +34,8 @@ impl ClassicalDomain {
             indices.contains(i)
         }).map(|(i, action)| action).collect()
     }
+
+    pub fn get_fact(&self, index: u32) -> &String {
+        self.facts.get_fact(index)
+    }
 }

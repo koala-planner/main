@@ -22,20 +22,20 @@ def solve(domain, problem):
         grounder_path + "parsed.htn",
         serilazer_path + "result.ground"], capture_output=False
     )
-    os.remove(grounder_path + "parsed.htn")
+    # os.remove(grounder_path + "parsed.htn")
     print("<<<<<<<<<< Grounding Complete >>>>>>>>>>")
     # Serializing
     subprocess.run(
         ["python3", serilazer_path + "htn_parser.py",
          serilazer_path + "result.ground", planner_path + "result.json"],
         capture_output=False)
-    os.remove(serilazer_path + "result.ground")
+    # os.remove(serilazer_path + "result.ground")
     print("<<<<<<<<<< Conversion to JSON Complete >>>>>>>>>>")
     # Search
     print("<<<<<<<<<< Starting Search >>>>>>>>>>")
     subprocess.run(
-        [planner_path + "target/release/planner", planner_path + "result.json"],
-        capture_output=False)
+       [planner_path + "target/debug/planner", planner_path + "result.json"],
+       capture_output=False)
 
 if __name__ == "__main__":
     args = sys.argv

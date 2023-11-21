@@ -355,6 +355,7 @@ task_def : '(' task_or_action NAME
 						s.append(std::to_string(i));
 						m.name = new_name;
 						m.vars = $4;
+						// at is short for Abstract Task
 						m.atArguments = args->vars;
 						m.newVarForAT = args->newVar;
 						m.prec = $5;
@@ -543,7 +544,9 @@ gd_equality_constraint : '(' '=' var_or_const var_or_const ')' {$$ = new general
 
 var_or_const-list :   var_or_const-list NAME {
 						$$ = $1;
-						string c($2); string s = "sort_for_" + c; string v = "?var_for_" + c;
+						string c($2);
+						string s = "sort_for_" + c;
+						string v = "?var_for_" + c;
 						sorts[s].insert(c);
 						$$->vars.push_back(v);
 						$$->newVar.insert(make_pair(v,s));
