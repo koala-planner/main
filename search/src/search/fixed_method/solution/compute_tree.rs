@@ -1,4 +1,4 @@
-use crate::domain_description::ClassicalDomain;
+use crate::domain_description::{ClassicalDomain, Facts};
 use crate::relaxation::OutcomeDeterminizer;
 use std::collections::{HashMap, HashSet, LinkedList, BTreeSet};
 use std::vec;
@@ -71,10 +71,10 @@ impl ComputeTree  {
         argmax
     }
 
-    pub fn search_result(&self) -> SearchResult {
+    pub fn search_result(&self, facts: &Facts) -> SearchResult {
         let root = self.ids.get(&self.root).unwrap().borrow();
         match root.status {
-            NodeStatus::Solved => SearchResult::Success(FMPolicy::new(self)),
+            NodeStatus::Solved => SearchResult::Success(FMPolicy::new(facts, self)),
             NodeStatus::Failed => SearchResult::NoSolution,
             NodeStatus::OnGoing => panic!("computation not terminated"),
         }

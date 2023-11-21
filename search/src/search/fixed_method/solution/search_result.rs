@@ -20,11 +20,7 @@ impl std::fmt::Display for SearchResult {
         match self {
             Self::NoSolution => write!(f, "Problem has no solution"),
             Self::Success(x) => {
-                for (state, history, action) in x.transitions.iter() {
-                    writeln!(f, "State: {:?}\nHistory: {:?}\nAction: {}", state, history, action);
-                    writeln!(f, "---------------------------------------------");
-                }
-                Ok(())
+                x.fmt(f)
             }
         }
     }

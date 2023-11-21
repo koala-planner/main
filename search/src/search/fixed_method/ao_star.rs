@@ -16,6 +16,6 @@ impl AOStarSearch {
             compute_tree.expand(n);
             compute_tree.backward_cost_revision(n);
         }
-        compute_tree.search_result()
+        compute_tree.search_result(&problem.facts)
     }
 }

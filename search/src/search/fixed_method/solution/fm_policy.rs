@@ -1,6 +1,8 @@
 use std::{collections::{HashSet, LinkedList, HashMap}, vec};
 use std::rc::Rc;
 
+use crate::domain_description::{DomainTasks, Facts};
+
 use super::SearchNode;
 
 use super::ComputeTree;
@@ -8,11 +10,11 @@ use super::ConnectionLabel;
 
 #[derive(Debug)]
 pub struct FMPolicy {
-    pub transitions: Vec<(HashSet<u32>, Rc<Vec<String>>, String)>
+    pub transitions: Vec<(HashSet<String>, Rc<Vec<String>>, String)>
 }
 
 impl FMPolicy {
-    pub fn new(computation_history: &ComputeTree) -> FMPolicy {
+    pub fn new(facts: &Facts, computation_history: &ComputeTree) -> FMPolicy {
         // vec of (state, vec(exectuted_task_names), new_task)
         let mut policy = vec![];
         let mut working_set: LinkedList<(u32, Rc<Vec<String>>)> = LinkedList::from([(computation_history.root, Rc::new(vec![]))]);
@@ -20,6 +22,9 @@ impl FMPolicy {
         while !working_set.is_empty() {
             let (id, history) = working_set.pop_front().unwrap();
             let node = computation_history.ids.get(&id).unwrap().borrow();
+            let state: HashSet<String> = node.search_node.state.as_ref().iter().map(|x| {
+                facts.get_fact(*x).clone()
+            }).collect();
             // Is node terminal?
             match &node.connections {
                 Some(connection) => {
@@ -32,7 +37,6 @@ impl FMPolicy {
                                 }
                             },
                             ConnectionLabel::Execution(name, cost) => {
-                                let state = node.search_node.state.as_ref().clone();
                                 policy.push((state, history.clone(), name.clone()));
                                 let mut new_history = history.as_ref().clone();
                                 new_history.push(name.clone());
@@ -43,11 +47,25 @@ impl FMPolicy {
                             }
                         }
                     }
-                    // TODO: consider the other possibility
+                    else {
+                        policy.push((state, history.clone(), "noop".to_string()));
+                    }
                 }
-                None => { }
+                None => {
+                    unreachable!()
+                }
             } 
         }
         FMPolicy { transitions: policy }
+    }
+}
+
+impl std::fmt::Display for FMPolicy {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        for (state, history, action) in self.transitions.iter() {
+            writeln!(f, "State: {:?}\nHistory: {:?}\nAction: {}", state, history, action);
+            writeln!(f, "---------------------------------------------");
+        }
+        Ok(())
     }
 }
