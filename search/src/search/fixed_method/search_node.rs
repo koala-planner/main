@@ -23,7 +23,7 @@ impl SearchNode {
         );
         let goal_state = encoder.compute_goal_state(&task_ids);
         let ff_val = FF::calculate_h(&encoder.domain, &relaxed_state, &goal_state);
-        if ff_val > (task_ids.len() as f32) { ff_val } else { task_ids.len() as f32 }
+        ff_val
     }
 
     pub fn is_goal(&self) -> bool {

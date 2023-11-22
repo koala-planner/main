@@ -56,19 +56,19 @@ impl ComputeTree  {
         }
     }
 
-    pub fn get_max_cost_node(&self, nodes: &BTreeSet<u32>) -> u32 {
+    pub fn get_max_cost_node(&self, nodes: &BTreeSet<u32>) -> (u32, f32) {
         let (mut argmax, mut max_cost) = (u32::MAX, f32::INFINITY);
         for id in nodes.iter() {
-            let cost = self.ids.get(id).unwrap().borrow().cost;
-            if cost < max_cost {
-                max_cost = cost;
+            let node = self.ids.get(id).unwrap().borrow();
+            if node.cost < max_cost {
+                max_cost = node.cost;
                 argmax = *id;
             }
         }
         if argmax == u32::MAX {
             panic!("undefined behavior");
         }
-        argmax
+        (argmax, max_cost)
     }
 
     pub fn search_result(&self, facts: &Facts) -> SearchResult {
@@ -163,7 +163,7 @@ impl ComputeTree  {
                     let mut child_label = NodeStatus::OnGoing;
                     if h == f32::INFINITY {
                         child_label = NodeStatus::Failed;
-                    } else if y.is_goal(){
+                    } else if y.is_goal() {
                         child_label = NodeStatus::Solved;
                     }
                     ComputeTreeNode {
@@ -183,14 +183,9 @@ impl ComputeTree  {
                 children_id.insert(self.cursor);
                 self.cursor += 1;
             }
-            let mut connection_cost = 0.0;
-            match &action_type {
-                ConnectionLabel::Decomposition(name) => {}
-                ConnectionLabel::Execution(name, cost) => connection_cost += *cost as f32,
-            }
             node_connections.push(HyperArc {
                 children: children_id,
-                cost: connection_cost,
+                cost: 1.0, // Cost is set to progression depth
                 is_marked: false,
                 action_type: action_type,
             });
@@ -227,6 +222,10 @@ impl ComputeTree  {
                     }
                     NodeStatus::Solved => {
                         node.status = NodeStatus::Solved;
+                        let (min_cost, arg_min) =
+                            self.compute_min_cost(node.connections.as_ref().unwrap());
+                        node.mark(arg_min);
+                        node.cost = min_cost;
                         return node.parent_id;
                     }
                     // children are not terminal
