@@ -42,6 +42,23 @@ impl HTN {
         }).collect()
     }
 
+    // Counts the number of tasks in the network grouped by their mapping
+    pub fn count_tasks_with_frequency(&self) -> HashMap<u32, u32> {
+        let task_ids: Vec<_> = self.mappings.iter().map(|(_, v)| {
+            *v
+        }).collect();
+        let mut result = HashMap::new();
+        for id in task_ids.iter() {
+            if result.contains_key(id) {
+                let val = result.get_mut(id).unwrap();
+                *val += 1;
+            } else {
+                result.insert(*id, 1);
+            }
+        }
+        result
+    }
+
     pub fn get_all_tasks_with_ids(&self) -> Vec<(&RefCell<Task>, u32)> {
         self.network.nodes.iter().map(|id| {
             (self.get_task(*id), *id)
@@ -535,6 +552,24 @@ mod tests {
         assert_eq!(new_tn.get_task(3).borrow().get_name(), format!("HireBuilder"));
         assert_eq!(new_tn.get_task(4).borrow().get_name(), format!("Construct"));
         assert_eq!(new_tn.get_task(5).borrow().get_name(), format!("PayBuilder"));
+    }
+
+    #[test]
+    pub fn task_occurances_test() {
+        let t: BTreeSet<u32> = BTreeSet::from([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+        let mut domain = Rc::new(create_initial_tasks());
+        let alpha = HashMap::from(
+            [(1, 0), (2, 1), (3, 2), (4, 3), (5,3), (6,3), (7,1), (8,2), (9,0)]
+        );
+        let orderings: Vec<(u32, u32)> = vec![(1,9), (2,1), (5,6), (6,7)];
+        let network = HTN::new(t.clone(), orderings, domain.clone(), alpha);
+        let occurances = network.count_tasks_with_frequency();
+        assert_eq!(occurances.len(), 4);
+        assert_eq!(*occurances.get(&0).unwrap(), 2);
+        assert_eq!(*occurances.get(&1).unwrap(), 2);
+        assert_eq!(*occurances.get(&2).unwrap(), 2);
+        assert_eq!(*occurances.get(&3).unwrap(), 3);
+
     }
 
     #[test]

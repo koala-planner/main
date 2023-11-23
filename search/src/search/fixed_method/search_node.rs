@@ -14,15 +14,22 @@ impl SearchNode {
     }
     
     pub fn compute_heuristic_value(&self, encoder: &ToClassical, bijection: &HashMap<u32, u32>) -> f32 {
-        let task_ids = self.tn.get_all_task_mappings().iter().map(|x| {
-            *bijection.get(x).unwrap()
+        let occurances = self.tn.count_tasks_with_frequency();
+        let task_ids = occurances.iter().map(|(task, _)| {
+            *bijection.get(task).unwrap()
         }).collect();
         let relaxed_state = encoder.compute_relaxed_state(
             &task_ids,
             self.state.as_ref()
         );
         let goal_state = encoder.compute_goal_state(&task_ids);
-        let ff_val = FF::calculate_h(&encoder.domain, &relaxed_state, &goal_state);
+        let mut ff_val = FF::calculate_h(&encoder.domain, &relaxed_state, &goal_state);
+        // Compensate for the repetition of tasks
+        for (_, count) in occurances {
+            if count > 1 {
+                ff_val += (count - 1) as f32
+            }
+        }
         ff_val
     }
 

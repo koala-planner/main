@@ -34,7 +34,7 @@ def solve(domain, problem):
     # Search
     print("<<<<<<<<<< Starting Search >>>>>>>>>>")
     subprocess.run(
-       [planner_path + "target/debug/planner", planner_path + "result.json"],
+       [planner_path + "target/release/planner", planner_path + "result.json"],
        capture_output=False)
 
 if __name__ == "__main__":
