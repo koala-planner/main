@@ -26,16 +26,16 @@ impl FF {
 
     fn plan_length(domain: &ClassicalDomain, graphplan: GraphPlan, goal_state: &HashSet<u32>) -> u32 {
         let mut len = 0;
-        let mut G = graphplan.compute_goal_indices(goal_state);
+        let mut g = graphplan.compute_goal_indices(goal_state);
         let mut marks = HashMap::new();
         for i in 0..graphplan.depth + 1 {
             marks.insert(i, HashSet::new());
         }
         for i in (1..graphplan.depth + 1).rev() {
-            if G.get(&i).is_none() {
+            if g.get(&i).is_none() {
                 continue;
             }
-            let open_goals: HashSet<u32> = G.get(&i).unwrap().difference(marks.get(&i).unwrap()).cloned().collect();
+            let open_goals: HashSet<u32> = g.get(&i).unwrap().difference(marks.get(&i).unwrap()).cloned().collect();
             for open_goal in open_goals.iter() {
                 let actions = graphplan.get_action_layer(i-1);
                 let mut actions = domain.get_actions_by_index(actions);
@@ -63,12 +63,12 @@ impl FF {
                 // add open preconds to their corresponding layer 
                 for precond in open_preconds.iter() {
                     let membership_layer = graphplan.facts.get(&precond).unwrap();
-                    match G.get_mut(membership_layer) {
+                    match g.get_mut(membership_layer) {
                         Some(set) => {
                             set.insert(precond.clone());
                         },
                         None => {
-                            G.insert(*membership_layer, HashSet::from([*precond]));
+                            g.insert(*membership_layer, HashSet::from([*precond]));
                         }
                     }
                 }

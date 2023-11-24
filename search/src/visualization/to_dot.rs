@@ -13,8 +13,7 @@ impl ToDOT {
         let mut vertices = String::new();
         let mut edges = String::new();
         for (i, val) in tree.ids.iter() {
-            let color = ToDOT::node_color(&val.borrow().status);
-            vertices += &format!("\t{} [label={}, color={:?}]\n", i, i, color);
+            vertices += &format!("\t{} [label={}, color={:?}]\n", i, i, ToDOT::node_color(&val.borrow().status));
             match val.borrow().connections.as_ref() {
                 Some(x) => {
                     let mut connectors = vec![];
@@ -54,11 +53,11 @@ impl ToDOT {
         }
         format!("digraph {{\n{}\n{}\n}}", vertices, edges)
     }
-    fn node_color(status: &NodeStatus) -> Color {
+    fn node_color(status: &NodeStatus) -> &str {
         match status {
-            NodeStatus::Solved => Color::green,
-            NodeStatus::Failed => Color::red,
-            NodeStatus::OnGoing => Color::blue
+            NodeStatus::Solved => "green",
+            NodeStatus::Failed => "red",
+            NodeStatus::OnGoing => "blue"
         }
     }
 
@@ -89,11 +88,4 @@ impl ToDOT {
         }
         string
     }
-}
-
-#[derive(Debug)]
-enum Color {
-    red,
-    green,
-    blue
 }
