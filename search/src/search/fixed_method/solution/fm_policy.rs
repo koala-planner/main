@@ -9,8 +9,14 @@ use super::ComputeTree;
 use super::ConnectionLabel;
 
 #[derive(Debug)]
+pub struct FMPolicyNode{
+    pub state: HashSet<String>,
+    pub execution_history: Rc<Vec<String>>
+}
+
+#[derive(Debug)]
 pub struct FMPolicy {
-    pub transitions: Vec<(HashSet<String>, Rc<Vec<String>>, String)>
+    pub transitions: Vec<(FMPolicyNode, String)>
 }
 
 impl FMPolicy {
@@ -37,7 +43,11 @@ impl FMPolicy {
                                 }
                             },
                             ConnectionLabel::Execution(name, cost) => {
-                                policy.push((state, history.clone(), name.clone()));
+                                let new_policy_node = FMPolicyNode {
+                                    state: state,
+                                    execution_history: history.clone()
+                                };
+                                policy.push((new_policy_node, name.clone()));
                                 let mut new_history = history.as_ref().clone();
                                 new_history.push(name.clone());
                                 let new_history = Rc::new(new_history);
@@ -48,11 +58,15 @@ impl FMPolicy {
                         }
                     }
                     else {
-                        policy.push((state, history.clone(), "noop".to_string()));
+                        unreachable!()
                     }
                 }
                 None => {
-                    unreachable!()
+                    let new_policy_node = FMPolicyNode {
+                        state: state,
+                        execution_history: history.clone()
+                    };
+                    policy.push((new_policy_node, "None".to_string()));
                 }
             } 
         }
@@ -62,8 +76,8 @@ impl FMPolicy {
 
 impl std::fmt::Display for FMPolicy {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        for (state, history, action) in self.transitions.iter() {
-            writeln!(f, "State: {:?}\nHistory: {:?}\nAction: {}", state, history, action);
+        for (policy_node, action) in self.transitions.iter() {
+            writeln!(f, "State: {:?}\nHistory: {:?}\nAction: {}", policy_node.state, policy_node.execution_history, action);
             writeln!(f, "---------------------------------------------");
         }
         Ok(())

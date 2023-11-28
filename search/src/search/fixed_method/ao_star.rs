@@ -17,10 +17,8 @@ impl AOStarSearch {
             compute_tree.expand(n);
             compute_tree.backward_cost_revision(n);
             let root_cost = compute_tree.ids.get(&1).unwrap().borrow().cost;
-            print!("\rExpanded {} nodes (root f-val = {})", counter, root_cost);
             counter+=1;
         }
-        println!("\n\n");
         compute_tree.search_result(&problem.facts)
     }
 }
