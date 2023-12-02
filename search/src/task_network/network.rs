@@ -163,24 +163,6 @@ impl HTN {
         }).collect()
     }
 
-    // pub fn is_isomorphic(tn1: &HTN, tn2: &HTN) -> bool {
-    //     let layers_1 = tn1.network.to_layers();
-    //     let layers_2 = tn2.network.to_layers();
-    //     if layers_1.len() != layers_2.len() {
-    //         return false;
-    //     }
-    //     let tasks_1 = tn1.layers_to_tasks(layers_1);
-    //     let tasks_2 = tn2.layers_to_tasks(layers_2);
-
-    //     for (x, y) in tasks_1.into_iter().zip(tasks_2.into_iter()) {
-    //         if x != y {
-    //             return false;
-    //         }
-    //     }
-
-    //     return true;
-    // }
-
     pub fn apply_action(&self, id: u32) -> HTN {
         if !self.is_primitive(id) {
             panic!("Task is not primitive")
@@ -191,17 +173,52 @@ impl HTN {
         HTN { network: new_graph, mappings: new_mapping, domain: self.domain.clone()}
     }
 
-    // fn layers_to_tasks(&self, layers: Vec<HashSet<u32>>) -> Vec<HashSet<&Task>> {
-    //     let mut result = Vec::with_capacity(layers.len());
-    //     for layer in layers.into_iter() {
-    //         let tasks = layer.into_iter().map(|x| {
-    //             let task_id = self.mappings.get(&x).unwrap();
-    //             self.get_task(*task_id)
-    //         });
-    //         result.push(tasks.collect());
-    //     }
-    //     result
-    // }
+    fn is_approximately_isomorphic(tn1: &HTN, tn2: &HTN) -> bool {
+        let layers_1 = tn1.network.to_layers();
+        let layers_2 = tn2.network.to_layers();
+        if layers_1.len() != layers_2.len() {
+            return false;
+        }
+        let tasks_1 = tn1.layers_to_tasks(layers_1);
+        let tasks_2 = tn2.layers_to_tasks(layers_2);
+        for (x, y) in tasks_1.into_iter().zip(tasks_2.into_iter()) {
+            if x != y {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    pub fn is_isomorphic(tn1: &HTN, tn2: &HTN) -> bool {
+        let tasks1 = tn1.count_tasks_with_frequency();
+        let tasks2 = tn2.count_tasks_with_frequency();
+        for (t, count) in tasks1.iter() {
+            if tasks2.contains_key(t) {
+                if tasks2.get(t).unwrap() != count {
+                    return false;
+                }
+            } else {
+                return false;
+            }
+        }
+        if HTN::is_approximately_isomorphic(tn1, tn2) {
+            // TODO: do exhaustive search
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    fn layers_to_tasks(&self, layers: Vec<HashSet<u32>>) -> Vec<HashSet<u32>> {
+        let mut result = Vec::with_capacity(layers.len());
+        for layer in layers.into_iter() {
+            let tasks = layer.into_iter().map(|x| {
+                *self.mappings.get(&x).unwrap()
+            });
+            result.push(tasks.collect());
+        }
+        result
+    }
 
     pub fn is_primitive(&self, id: u32) -> bool {
         if !self.mappings.contains_key(&id) {
@@ -410,34 +427,44 @@ mod tests {
     }
 
     #[test]
-    // pub fn isomorphism_test() {
-    //     let domain = Rc::new(create_initial_tasks());
-    //     // first graph
-    //     let nodes1: BTreeSet<u32> = BTreeSet::from([1, 2, 3, 4]);
-    //     let orderings1: Vec<(u32, u32)> = Vec::from([(1, 3), (2, 3), (3, 4)]);
-    //     let alpha =
-    //     HashMap::from([(1, 1), (2, 2), (3, 3), (4, 4)]);
-    //     let htn1 = HTN::new(
-    //         nodes1,
-    //         orderings1,
-    //         domain.clone(),
-    //         alpha,
-    //     );
+    pub fn isomorphism_test() {
+        let domain = Rc::new(create_initial_tasks());
+        // first graph
+        let nodes1: BTreeSet<u32> = BTreeSet::from([1, 2, 3, 4]);
+        let orderings1: Vec<(u32, u32)> = Vec::from([(1, 3), (2, 3), (3, 4)]);
+        let alpha =
+        HashMap::from([(1, 1), (2, 2), (3, 3), (4, 4)]);
+        let htn1 = HTN::new(
+            nodes1,
+            orderings1,
+            domain.clone(),
+            alpha,
+        );
 
-    //     let domain2 = Rc::new(create_initial_tasks());
-    //     // second graph
-    //     let nodes2: BTreeSet<u32> = BTreeSet::from([5, 6, 7, 8]);
-    //     let orderings2: Vec<(u32, u32)> = Vec::from([(5, 7), (6, 7), (7, 8)]);
-    //     let htn2 = HTN::new(
-    //         nodes2,
-    //         orderings2,
-    //         domain2.clone(),
-    //         HashMap::from([(5, 1), (6, 2), (7, 3), (8, 4)]),
-    //     );
-
-    //     let result = HTN::is_isomorphic(&htn1, &htn2);
-    //     assert_eq!(result, true);
-    // }
+        let domain2 = Rc::new(create_initial_tasks());
+        // second graph
+        let nodes2: BTreeSet<u32> = BTreeSet::from([5, 6, 7, 8]);
+        let orderings2: Vec<(u32, u32)> = Vec::from([(5, 7), (6, 7), (7, 8)]);
+        let htn2 = HTN::new(
+            nodes2,
+            orderings2,
+            domain2.clone(),
+            HashMap::from([(5, 1), (6, 2), (7, 3), (8, 4)]),
+        );
+        let result = HTN::is_approximately_isomorphic(&htn1, &htn2);
+        assert_eq!(result, true);
+        // third graph
+        let nodes3: BTreeSet<u32> = BTreeSet::from([5, 6]);
+        let orderings3: Vec<(u32, u32)> = Vec::from([(5, 6)]);
+        let htn3 = HTN::new(
+            nodes3,
+            orderings3,
+            domain.clone(),
+            HashMap::from([(5, 1), (6, 2)]),
+        );
+        let result = HTN::is_approximately_isomorphic(&htn1, &htn3);
+        assert_eq!(result, false);
+    }
 
     #[test]
     pub fn is_primitive_test() {
