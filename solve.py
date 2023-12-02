@@ -25,7 +25,8 @@ def solve(domain, problem, timeout=30):
         )
         os.remove(grounder_path + "parsed.htn")
     else:
-        print(f"failed to parse {problem}", file=sys.stderr)
+        print(f"\t\tfailed to parse {problem}", file=sys.stderr)
+        return
     # Serializing
     if os.path.isfile(serilazer_path + "result.sas+"):
         subprocess.run(
@@ -34,7 +35,8 @@ def solve(domain, problem, timeout=30):
             capture_output=True)
         os.remove(serilazer_path + "result.sas+")
     else:
-        print(f"failed to ground {problem}", file=sys.stderr)
+        print(f"\t\tfailed to ground {problem}", file=sys.stderr)
+        return
     # Search
     if os.path.isfile(planner_path + "result.json"):
         try:
@@ -44,7 +46,7 @@ def solve(domain, problem, timeout=30):
             with open(path + f"/{problem}_solution.txt", "x") as f:
                 f.write(result.stdout.decode("utf-8"))
         except subprocess.TimeoutExpired:
-            print(f'Timeout for {problem}')
+            print(f'\t\ttimeout for {problem}')
         os.remove(planner_path + "result.json")
     else:
         print(f"failed to serialize {problem}", file=sys.stderr)
