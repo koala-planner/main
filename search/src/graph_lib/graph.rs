@@ -248,6 +248,115 @@ impl Graph {
         }
     }
 
+    // Labeled isomorphism
+    pub fn is_isomorphic(g1: &Graph, g2: &Graph, l1: HashMap<u32, u32>, l2: HashMap<u32, u32>) -> bool {
+        // bijection
+        let mut core_1 = HashMap::with_capacity(g1.count_nodes());
+        let mut core_2 = HashMap::with_capacity(g2.count_nodes());
+        // in-out terminals
+        let in_1 = HashMap::with_capacity(g1.count_nodes());
+        let in_2 = HashMap::with_capacity(g2.count_nodes());
+        let out_1 = HashMap::with_capacity(g1.count_nodes());
+        let out_2 = HashMap::with_capacity(g2.count_nodes());
+        // state = depth
+        let mut fringe: Vec<u32> = Vec::new();
+        fringe.push(0);
+        while !fringe.is_empty() {
+            let state = fringe.pop().unwrap();
+            // Compute P
+            let mut p: Vec<(u32, u32)> = vec![];
+            // TODO: check whether s should be bigger than "state" or 0
+            // TODO: Exxplore what does min mean
+            // image of in - out oin current state
+            let in_1_s: Vec<u32> = in_1.iter()
+                .filter(|(_, s)| **s > 0)
+                .map(|(x, _)| *x).collect();
+            let in_2_s: Vec<u32> = in_2.iter()
+                .filter(|(_, s)| **s > 0)
+                .map(|(x, _)| *x).collect();
+            let out_1_s: Vec<u32> = out_1.iter()
+                .filter(|(_, s)| **s > 0)
+                .map(|(x, _)| *x).collect();
+            let out_2_s: Vec<u32> = out_2.iter()
+                .filter(|(_, s)| **s > 0)
+                .map(|(x, _)| *x).collect();
+            // rule based construction
+            if (out_1_s.len() > 0) && (out_2_s.len() > 0) {
+                for p1 in out_1_s.into_iter() {
+                    for p2 in out_2_s.into_iter() {
+                        if l1.get(&p1).unwrap() == l2.get(&p2).unwrap() {
+                            p.push((p1, p2));
+                        }
+                    }
+                }
+            } else if (in_1_s.len() > 0) && (in_2_s.len() > 0) {
+                for p1 in in_1_s.into_iter() {
+                    for p2 in in_2_s.into_iter() {
+                        if l1.get(&p1).unwrap() == l2.get(&p2).unwrap() {
+                            p.push((p1, p2));
+                        }
+                    }
+                }
+            } else {
+                let p1_list: Vec<u32> = g1.nodes.difference(&BTreeSet::from_iter(core_1
+                        .iter().map(|(x, _)| *x))).cloned().collect();
+                let p2_list: Vec<u32> = g2.nodes.difference(&BTreeSet::from_iter(core_2
+                        .iter().map(|(x, _)| *x))).cloned().collect();
+                for p1 in p1_list.into_iter() {
+                    for p2 in p2_list.into_iter() {
+                        if l1.get(&p1).unwrap() == l2.get(&p2).unwrap() {
+                            p.push((p1, p2));
+                        }
+                    }
+                }
+            }
+            for (n, m) in p.iter() {
+                // assert same predecesssors
+                let pred_n_list = g1.get_incoming_edges(*n);
+                let pred_m_list = g1.get_incoming_edges(*m);
+                if pred_n_list.len() != pred_m_list.len() {
+                    continue;
+                } else {
+                    for pred_n in pred_n_list.iter() {
+                        let mut is_feasible = false;
+                        for pred_m in pred_m_list.iter() {
+                            if l1.get(pred_n).unwrap() == l2.get(pred_m).unwrap() {
+                                is_feasible = true;
+                                break;
+                            }
+                        }
+                        if is_feasible == false {
+                            continue;
+                        }
+                    }
+                }
+                // assert same successors
+                let succ_n_list = g1.get_outgoing_edges(*n);
+                let succ_m_list = g1.get_outgoing_edges(*m);
+                if succ_n_list.len() != succ_m_list.len() {
+                    continue;
+                } else {
+                    for succ_n in succ_n_list.iter() {
+                        let mut is_feasible = false;
+                        for succ_m in succ_m_list.iter() {
+                            if l1.get(succ_n).unwrap() == l2.get(succ_m).unwrap() {
+                                is_feasible = true;
+                                break;
+                            }
+                        }
+                        if is_feasible == false {
+                            continue;
+                        }
+                    }
+                }
+                core_1.insert(*n, state);
+                core_2.insert(*m, state);
+                fringe.push(state+1);
+            }
+        }
+        false
+    }
+
 }
 
 #[cfg(test)]
