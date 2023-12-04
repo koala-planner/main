@@ -2,3 +2,5 @@
 *.pyc
 *.json
 *.ground
+*.sas+
+*.txt
