@@ -3,7 +3,7 @@ use crate::relaxation::OutcomeDeterminizer;
 use std::collections::{HashMap, HashSet, LinkedList, BTreeSet};
 use std::vec;
 
-use super::fm_policy::FMPolicy;
+use super::fm_policy::StrongPolicy;
 use super::ConnectionLabel;
 use super::{connectors::NodeConnections, ComputeTreeNode, FONDProblem, SearchNode, SearchResult};
 use super::{HyperArc, NodeStatus, HTN};
@@ -74,7 +74,7 @@ impl ComputeTree  {
     pub fn search_result(&self, facts: &Facts) -> SearchResult {
         let root = self.ids.get(&self.root).unwrap().borrow();
         match root.status {
-            NodeStatus::Solved => SearchResult::Success(FMPolicy::new(facts, self)),
+            NodeStatus::Solved => SearchResult::Success(StrongPolicy::new(facts, self)),
             NodeStatus::Failed => SearchResult::NoSolution,
             NodeStatus::OnGoing => panic!("computation not terminated"),
         }
@@ -377,7 +377,7 @@ mod tests {
                 HyperArc { children: HashSet::from([3, 4]), cost: 1.0, is_marked: true,
                     action_type: ConnectionLabel::Execution("p2".to_string(), 2)},
                 HyperArc { children: HashSet::from([5]), cost: 0.0, is_marked: false,
-                    action_type: ConnectionLabel::Decomposition("m1".to_string())},
+                    action_type: ConnectionLabel::Decomposition("t1".to_string(), "m1".to_string())},
             ]}),
             cost: 2.0,
             status: NodeStatus::OnGoing
@@ -394,7 +394,7 @@ mod tests {
             search_node: dummy_search_node.clone(),
             connections: Some(NodeConnections { children: vec![
                 HyperArc { children: HashSet::from([6]), cost: 1.0, is_marked: true,
-                    action_type: ConnectionLabel::Decomposition("m3".to_string())}
+                    action_type: ConnectionLabel::Decomposition("t1".to_string(), "m3".to_string())}
             ]}),
             cost: 2.0,
             status: NodeStatus::OnGoing
@@ -532,7 +532,7 @@ mod tests {
             },
             connections: Some(NodeConnections { children: vec![
                 HyperArc { children: HashSet::from([6]), cost: 1.0, is_marked: true,
-                    action_type: ConnectionLabel::Decomposition("m3".to_string())}
+                    action_type: ConnectionLabel::Decomposition("t1".to_string(), "m3".to_string())}
             ]}),
             cost: 2.0,
             status: NodeStatus::OnGoing

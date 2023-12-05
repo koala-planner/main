@@ -103,7 +103,7 @@ impl SearchNode {
                 );
                 expansions.push(
                     NodeExpansion {
-                        connection_label: ConnectionLabel::Decomposition(method.name.clone()),
+                        connection_label: ConnectionLabel::Decomposition(t.name.clone(), method.name.clone()),
                         items: vec![new_search_node]
                     });
             }
@@ -122,14 +122,15 @@ pub struct NodeExpansion {
 
 #[derive(Debug)]
 pub enum ConnectionLabel {
-    Execution(String, u32), 
-    Decomposition(String)
+    Execution(String, u32),
+    // task name - method name 
+    Decomposition(String, String)
 }
 
 impl ConnectionLabel {
     pub fn is_decomposition(&self) -> bool {
         match  &self {
-            ConnectionLabel::Decomposition(_) => true,
+            ConnectionLabel::Decomposition(_, _) => true,
             _ => false
         }
     }
@@ -137,28 +138,7 @@ impl ConnectionLabel {
     pub fn get_label(&self) -> String {
         match self {
             Self::Execution(name, _) => name.clone(),
-            Self::Decomposition(name) => name.clone()
-        }
-    }
-}
-
-impl PartialEq for ConnectionLabel {
-    fn eq(&self, rhs: &ConnectionLabel) -> bool {
-        match self {
-            Self::Execution(name, _) => {
-                if let ConnectionLabel::Execution(name_rhs, _) = rhs {
-                    return name == name_rhs;
-                } else {
-                    false
-                }
-            },
-            Self::Decomposition(name) => {
-                if let ConnectionLabel::Decomposition(name_rhs) = rhs {
-                    return name == name_rhs;
-                } else {
-                    false
-                }
-            }
+            Self::Decomposition(name, method) => { name.clone() + &format!("_{}", method) }
         }
     }
 }
@@ -257,7 +237,7 @@ mod tests {
         }
         let exp_t1: Vec<&NodeExpansion> = expansion.iter().filter(|x| {
             match x.connection_label {
-                ConnectionLabel::Decomposition(_) => true,
+                ConnectionLabel::Decomposition(_, _) => true,
                 _ => false
             }
         }).collect();

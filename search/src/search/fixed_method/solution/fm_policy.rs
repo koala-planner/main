@@ -1,7 +1,7 @@
 use std::{collections::{HashSet, LinkedList, HashMap}, vec};
 use std::rc::Rc;
 
-use crate::domain_description::{DomainTasks, Facts};
+use crate::{domain_description::{DomainTasks, Facts}, task_network::HTN};
 
 use super::SearchNode;
 
@@ -9,50 +9,62 @@ use super::ComputeTree;
 use super::ConnectionLabel;
 
 #[derive(Debug)]
-pub struct FMPolicyNode{
+pub struct PolicyInput{
     pub state: HashSet<String>,
-    pub execution_history: Rc<Vec<String>>
+    pub tn: Rc<HTN>
 }
 
 #[derive(Debug)]
-pub struct FMPolicy {
-    pub transitions: Vec<(FMPolicyNode, String)>
+pub struct PolicyOutput{
+    pub task: String,
+    pub method: String 
 }
 
-impl FMPolicy {
-    pub fn new(facts: &Facts, computation_history: &ComputeTree) -> FMPolicy {
+#[derive(Debug)]
+pub struct StrongPolicy {
+    pub transitions: Vec<(PolicyInput, PolicyOutput)>
+}
+
+impl StrongPolicy {
+    pub fn new(facts: &Facts, computation_history: &ComputeTree) -> StrongPolicy {
         // vec of (state, vec(exectuted_task_names), new_task)
         let mut policy = vec![];
-        let mut working_set: LinkedList<(u32, Rc<Vec<String>>)> = LinkedList::from([(computation_history.root, Rc::new(vec![]))]);
+        let mut working_set: LinkedList<u32> = LinkedList::from([computation_history.root]);
         // TOOD: for each branch the execution history changes
         while !working_set.is_empty() {
-            let (id, history) = working_set.pop_front().unwrap();
+            let id = working_set.pop_front().unwrap();
             let node = computation_history.ids.get(&id).unwrap().borrow();
             let state: HashSet<String> = node.search_node.state.as_ref().iter().map(|x| {
                 facts.get_fact(*x).clone()
             }).collect();
+            let input = PolicyInput {
+                tn: node.search_node.tn.clone(),
+                state: state
+            };
             // Is node terminal?
             match &node.connections {
                 Some(connection) => {
                     if let Some(marked) = connection.has_marked_connection() {
                         // Check whether transition is decomposition or primitive action execution
                         match &marked.action_type {
-                            ConnectionLabel::Decomposition(_) => {
+                            ConnectionLabel::Decomposition(name, method) => {
+                                let output = PolicyOutput {
+                                    task: name.clone(),
+                                    method: method.clone()
+                                };
+                                policy.push((input, output));
                                 for child in marked.children.iter(){
-                                    working_set.push_back((*child, Rc::clone(&history)));
+                                    working_set.push_back(*child);
                                 }
                             },
-                            ConnectionLabel::Execution(name, cost) => {
-                                let new_policy_node = FMPolicyNode {
-                                    state: state,
-                                    execution_history: history.clone()
+                            ConnectionLabel::Execution(name, _) => {
+                                let output = PolicyOutput {
+                                    task: name.clone(),
+                                    method: "ε".to_string()
                                 };
-                                policy.push((new_policy_node, name.clone()));
-                                let mut new_history = history.as_ref().clone();
-                                new_history.push(name.clone());
-                                let new_history = Rc::new(new_history);
+                                policy.push((input, output));
                                 for child in marked.children.iter() {
-                                    working_set.push_back((*child, Rc::clone(&new_history)));
+                                    working_set.push_back(*child);
                                 }
                             }
                         }
@@ -62,22 +74,18 @@ impl FMPolicy {
                     }
                 }
                 None => {
-                    let new_policy_node = FMPolicyNode {
-                        state: state,
-                        execution_history: history.clone()
-                    };
-                    policy.push((new_policy_node, "None".to_string()));
+                    
                 }
             } 
         }
-        FMPolicy { transitions: policy }
+        StrongPolicy { transitions: policy }
     }
 }
 
-impl std::fmt::Display for FMPolicy {
+impl std::fmt::Display for StrongPolicy {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        for (policy_node, action) in self.transitions.iter() {
-            writeln!(f, "State: {:?}\nHistory: {:?}\nAction: {}", policy_node.state, policy_node.execution_history, action);
+        for (input, output) in self.transitions.iter() {
+            writeln!(f, "TN: {} \nState: {:?}\nTask: {}\nMethod: {}", input.tn, input.state, output.task, output.method);
             writeln!(f, "---------------------------------------------");
         }
         Ok(())

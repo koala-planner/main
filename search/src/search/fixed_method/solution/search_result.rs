@@ -1,8 +1,8 @@
-use super::fm_policy::FMPolicy;
+use super::fm_policy::StrongPolicy;
 
 #[derive(Debug)]
 pub enum SearchResult {
-    Success(FMPolicy),
+    Success(StrongPolicy),
     NoSolution
 }
 

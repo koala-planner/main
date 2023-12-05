@@ -57,14 +57,14 @@ mod test {
             children: HashSet::from([1,2,3]),
             cost: 0.0,
             is_marked: false,
-            action_type: ConnectionLabel::Decomposition("m1".to_string())
+            action_type: ConnectionLabel::Decomposition("t1".to_string(), "m1".to_string())
             
         };
         let arc2 = HyperArc {
             children: HashSet::from([5,4]),
             cost: 0.0,
             is_marked: true,
-            action_type: ConnectionLabel::Decomposition("m2".to_string())
+            action_type: ConnectionLabel::Decomposition("t1".to_string(), "m2".to_string())
         };
         let arc3 = HyperArc {
             children: HashSet::from([7,54]),
