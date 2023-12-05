@@ -80,8 +80,9 @@ impl ComputeTree  {
         }
     }
 
-    pub fn get_tip_nodes(&self) -> BTreeSet<u32> {
+    pub fn get_tip_nodes(&self) -> (BTreeSet<u32>, BTreeSet<u32>) {
         let mut working_set = BTreeSet::from([self.root]);
+        let mut policy_node_ids = BTreeSet::from([self.root]);
         let mut tip_node_ids = BTreeSet::new();
         while !working_set.is_empty() {
             let mut marked = BTreeSet::new();
@@ -103,7 +104,7 @@ impl ComputeTree  {
                                 None => {
                                     let (_, i) = self.compute_min_cost(connection);
                                     marked.extend(connection.children[i as usize].children.iter());
-                                                                        marker_update = Some(i);
+                                    marker_update = Some(i);
                                 }
                             }
                         }
@@ -121,12 +122,13 @@ impl ComputeTree  {
                 }
             }
             if marked.is_empty() {
-                return tip_node_ids;
+                return (policy_node_ids, tip_node_ids);
             } else {
+                policy_node_ids.extend(marked.iter());
                 working_set = marked;
             }
         }
-        tip_node_ids
+        (policy_node_ids, tip_node_ids)
     }
 
     fn mark_as_terminal(&mut self, id: u32) {
@@ -138,6 +140,21 @@ impl ComputeTree  {
             node.status = NodeStatus::Failed;
             node.cost = f32::INFINITY;
         }
+    }
+
+    pub fn is_visited(&self, node: u32, policy_nodes: BTreeSet<u32>) -> bool {
+        let p = &self.ids.get(&node).unwrap().borrow().search_node;
+        for pi_n_id in policy_nodes {
+            if pi_n_id == node {
+                continue;
+            } else {
+                let policy_node = &self.ids.get(&pi_n_id).unwrap().borrow().search_node;
+                if p == policy_node {
+                    return true;
+                }
+            }
+        }
+        false
     }
 
     pub fn expand(&mut self, id: u32) {
@@ -333,7 +350,7 @@ impl ComputeTree  {
 mod tests {
     use std::collections::BTreeSet;
 
-    use crate::{task_network::{Task, PrimitiveAction}, visualization::ToDOT, domain_description::DomainTasks};
+    use crate::{task_network::{Task, PrimitiveAction, CompoundTask}, visualization::ToDOT, domain_description::DomainTasks};
 
     use super::*;
     fn generate_tree() -> ComputeTree {
@@ -443,7 +460,7 @@ mod tests {
     pub fn tip_nodes_test() {
         let tree = generate_tree();
         tree.ids.get(&4).unwrap().borrow_mut().status = NodeStatus::OnGoing;
-        let tip_nodes = tree.get_tip_nodes();
+        let (p, tip_nodes) = tree.get_tip_nodes();
         assert_eq!(tip_nodes.len(), 2);
         assert_eq!(tip_nodes.contains(&4), true);
         assert_eq!(tip_nodes.contains(&6), true);
@@ -476,6 +493,58 @@ mod tests {
             Some(x) => assert_eq!(x, 6),
             None => panic!("parent not found")
         }
+    }
+
+    #[test]
+    pub fn cycle_detection_test() {
+        let t1 = Task::Compound(CompoundTask::new("t1".to_string(), vec![]));
+        let t2 = Task::Compound(CompoundTask::new("t2".to_string(), vec![]));
+        let domain = Rc::new(DomainTasks::new(vec![t1, t2]));
+        let n1 = ComputeTreeNode {
+            parent_id: Some(1),
+            search_node: SearchNode {
+                state: Rc::new(HashSet::from([1,2])),
+                tn: Rc::new(
+                    HTN::new(
+                        BTreeSet::from([1,2]), 
+                        vec![(1,2)], 
+                        domain.clone(),
+                HashMap::from([(1,0), (2,1)])
+                    )
+                )
+            },
+            connections: None,
+            cost: 10.0,
+            status: NodeStatus::OnGoing
+        };
+        let n2 = ComputeTreeNode {
+            parent_id: Some(1),
+            search_node: SearchNode {
+                state: Rc::new(HashSet::from([1,2])),
+                tn: Rc::new(
+                    HTN::new(
+                        BTreeSet::from([4,5]), 
+                        vec![(4,5)], 
+                        domain.clone(),
+                HashMap::from([(4,0), (5,1)])
+                    )
+                )
+            },
+            connections: Some(NodeConnections { children: vec![
+                HyperArc { children: HashSet::from([6]), cost: 1.0, is_marked: true,
+                    action_type: ConnectionLabel::Decomposition("m3".to_string())}
+            ]}),
+            cost: 2.0,
+            status: NodeStatus::OnGoing
+        };
+        let tree = ComputeTree {
+            ids: HashMap::from([(1, RefCell::new(n1)), (2, RefCell::new(n2))]),
+            root: 1,
+            cursor: 2,
+            relaxed_domain: None
+        };
+        let visited = tree.is_visited(1, BTreeSet::from([1,2]));
+        assert_eq!(true, visited)
     }
 
     // #[test]

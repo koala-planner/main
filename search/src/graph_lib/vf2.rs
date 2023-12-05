@@ -1,6 +1,6 @@
 use super::*;
 
-use std::collections::{HashMap,BTreeSet};
+use std::collections::{HashMap,BTreeSet, HashSet};
 
 
 pub fn vf2_isomorphism(g1: &Graph, g2: &Graph, l1: &HashMap<u32, u32>, l2: &HashMap<u32, u32>) -> bool {
@@ -18,20 +18,20 @@ pub fn vf2_isomorphism(g1: &Graph, g2: &Graph, l1: &HashMap<u32, u32>, l2: &Hash
         // Compute P
         let mut p: Vec<(u32, u32)> = vec![];
         // immediate predecessors of state
-        let in_1: HashMap<u32, BTreeSet<u32>> = state.iter()
-            .map(|(n1, _)| (*n1, g1.get_incoming_edges(*n1))).collect();
-        let in_2: HashMap<u32, BTreeSet<u32>> = state.iter()
-            .map(|(_, n2)| (*n2, g2.get_incoming_edges(*n2))).collect();
+        let in_1: HashSet<u32> = state.iter()
+            .map(|(n1, _)| g1.get_incoming_edges(*n1)).flatten().collect();
+        let in_2: HashSet<u32> = state.iter()
+            .map(|(_, n2)| g2.get_incoming_edges(*n2)).flatten().collect();
         // immediate predecessors of state
-        let out_1: HashMap<u32, BTreeSet<u32>> = state.iter()
-            .map(|(n1, _)| (*n1, g1.get_outgoing_edges(*n1))).collect();
-        let out_2: HashMap<u32, BTreeSet<u32>> = state.iter()
-            .map(|(_, n2)| (*n2, g2.get_outgoing_edges(*n2))).collect();
+        let out_1: HashSet<u32> = state.iter()
+            .map(|(n1, _)| g1.get_outgoing_edges(*n1)).flatten().collect();
+        let out_2: HashSet<u32> = state.iter()
+            .map(|(_, n2)| g2.get_outgoing_edges(*n2)).flatten().collect();
         // rule based construction
         // // if both "out"s are non-empty
         if (out_1.len() > 0) && (out_2.len() > 0) {
-            for (p1, _) in out_1.iter() {
-                for (p2, _) in out_2.iter() {
+            for p1 in out_1.iter() {
+                for p2 in out_2.iter() {
                     if l1.get(&p1).unwrap() == l2.get(&p2).unwrap() {
                         p.push((*p1, *p2));
                     }
@@ -39,8 +39,8 @@ pub fn vf2_isomorphism(g1: &Graph, g2: &Graph, l1: &HashMap<u32, u32>, l2: &Hash
             }
         // // if both "in"s are non-empty
         } else if (in_1.len() > 0) && (in_2.len() > 0) {
-            for (p1, _) in in_1.iter() {
-                for (p2, _) in in_2.iter() {
+            for p1 in in_1.iter() {
+                for p2 in in_2.iter() {
                     if l1.get(&p1).unwrap() == l2.get(&p2).unwrap() {
                         p.push((*p1, *p2));
                     }
@@ -67,42 +67,18 @@ pub fn vf2_isomorphism(g1: &Graph, g2: &Graph, l1: &HashMap<u32, u32>, l2: &Hash
                 continue;
             }
             // assert same predecesssors labels
-            let pred_n_list: BTreeSet<u32> = match in_1.get(n) {
-                Some(pred) => {
-                    pred.iter().map(|x| *l1.get(x).unwrap()).collect()
-                },
-                None => {
-                    BTreeSet::new()
-                }
-            };
-            let pred_m_list: BTreeSet<u32> = match in_2.get(m) {
-                Some(pred) => {
-                    pred.iter().map(|x| *l2.get(x).unwrap()).collect()
-                },
-                None => {
-                    BTreeSet::new()
-                }
-            };
+            let pred_n_list: BTreeSet<u32> = g1.get_incoming_edges(*n)
+                .iter().map(|x| *l1.get(x).unwrap()).collect();
+            let pred_m_list: BTreeSet<u32> = g2.get_incoming_edges(*m)
+                .iter().map(|x| *l2.get(x).unwrap()).collect();
             if pred_n_list != pred_m_list {
                 continue;
             }
             // assert same successors
-            let succ_n_list: BTreeSet<u32> = match out_1.get(n) {
-                Some(succ) => {
-                    succ.iter().map(|x| *l1.get(x).unwrap()).collect()
-                },
-                None => {
-                    BTreeSet::new()
-                }
-            };
-            let succ_m_list: BTreeSet<u32> = match out_2.get(m) {
-                Some(succ) => {
-                    succ.iter().map(|x| *l2.get(x).unwrap()).collect()
-                },
-                None => {
-                    BTreeSet::new()
-                }
-            };
+            let succ_n_list: BTreeSet<u32> = g1.get_outgoing_edges(*n)
+                .iter().map(|x| *l1.get(x).unwrap()).collect();
+            let succ_m_list: BTreeSet<u32> = g2.get_outgoing_edges(*m)
+                .iter().map(|x| *l2.get(x).unwrap()).collect();
             if succ_n_list != succ_m_list {
                 continue;
             }
@@ -147,5 +123,14 @@ mod tests {
         let l4 = HashMap::from([(4,1), (5,2), (6,3), (7,2)]);
         let result = vf2_isomorphism(&g2, &g4, &l2, &l4);
         assert_eq!(result, false);
+    }
+
+    #[test]
+    pub fn vf2_correctness_test2() {
+        let g1 = Graph::new(BTreeSet::from([5,6]), vec![(5,6)]);
+        let g2 = Graph::new(BTreeSet::from([1,2]), vec![(1,2)]);
+        let l1 = HashMap::from([(5,1), (6,2)]);
+        let l2 = HashMap::from([(1,1), (2,2)]);
+        assert_eq!(vf2_isomorphism(&g1, &g2, &l1, &l2), true);
     }
 }

@@ -163,6 +163,17 @@ impl PartialEq for ConnectionLabel {
     }
 }
 
+impl PartialEq for SearchNode {
+    fn eq(&self, rhs: &SearchNode) -> bool {
+        if *self.state == *rhs.state {
+            HTN::is_isomorphic(&self.tn, &rhs.tn)
+        } else {
+            false
+        }
+
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;

@@ -50,6 +50,11 @@ impl ComputeTreeNode {
         }
     }
 
+    pub fn fail(&mut self) {
+        self.cost = f32::INFINITY;
+        self.status = NodeStatus::Failed;
+    } 
+
     pub fn is_terminal(&self) -> bool {
         self.status.is_terminal()
     }

@@ -1,6 +1,7 @@
 use crate::domain_description::DomainTasks;
 
 use super::Graph;
+use super::vf2_isomorphism;
 use super::task_structs::{CompoundTask, Method, PrimitiveAction, Task};
 use std::collections::{HashMap, HashSet, BTreeSet};
 use std::fmt::{self, write};
@@ -202,10 +203,9 @@ impl HTN {
             }
         }
         if HTN::is_approximately_isomorphic(tn1, tn2) {
-            // TODO: do exhaustive search
-            return true;
+            vf2_isomorphism(&tn1.network, &tn2.network, &tn1.mappings, &tn2.mappings)
         } else {
-            return false;
+            return false
         }
     }
 
