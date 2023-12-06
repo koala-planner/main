@@ -2,11 +2,12 @@ use super::{SearchNode, NodeConnections, connectors::HyperArc};
 
 #[derive(Debug)]
 pub struct ComputeTreeNode {
-    pub parent_id: Option<u32>,
+    pub parents: Option<Vec<u32>>,
     pub search_node: SearchNode,
     pub connections: Option<NodeConnections>,
     pub cost: f32,
     pub status: NodeStatus,
+    pub depth: u16,
 }
 
 #[derive(Debug, Clone)]
@@ -50,9 +51,16 @@ impl ComputeTreeNode {
         }
     }
 
-    pub fn fail(&mut self) {
-        self.cost = f32::INFINITY;
-        self.status = NodeStatus::Failed;
+    pub fn add_parent(&mut self, id: u32) {
+        self.parents = match &self.parents {
+            Some(parents) => {
+                let p = parents.clone();
+                Some(p)
+            },
+            None => {
+                panic!("attempting to add parent to root");
+            }
+        }
     } 
 
     pub fn is_terminal(&self) -> bool {

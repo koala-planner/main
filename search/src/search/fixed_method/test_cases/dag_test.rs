@@ -8,7 +8,7 @@ use super::{AOStarSearch, FONDProblem};
 
 #[cfg(test)]
 #[test]
-pub fn cyclic_failure_test() {
+pub fn dag_test() {
     use std::collections::BTreeSet;
     use crate::domain_description::{Facts, DomainTasks};
 
@@ -70,5 +70,5 @@ pub fn cyclic_failure_test() {
     };
     problem.collapse_tn();
     let result = AOStarSearch::run(&problem);
-    assert_eq!(result.is_success(), false);
+    assert_eq!(result.is_success(), true);
 }

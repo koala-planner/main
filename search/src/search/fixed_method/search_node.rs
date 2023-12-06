@@ -49,7 +49,7 @@ impl SearchNode {
         // expand all abstract tasks
         for abstract_id in abstract_tasks.iter() {
             let abstract_expansions = self.expand_abstract_task(*abstract_id);
-            expansions.extend(*abstract_expansions);
+            expansions.extend(abstract_expansions);
         }
         expansions
     }
@@ -92,7 +92,7 @@ impl SearchNode {
         expansion
     } 
 
-    fn expand_abstract_task(&self, task_id: u32) -> Box<Vec<NodeExpansion>> {
+    fn expand_abstract_task(&self, task_id: u32) -> Vec<NodeExpansion> {
         if let Task::Compound(t) = &*self.tn.get_task(task_id).borrow() {
             let mut expansions = vec![];
             for method in t.methods.iter() {
@@ -107,7 +107,7 @@ impl SearchNode {
                         items: vec![new_search_node]
                     });
             }
-            return Box::new(expansions)
+            return expansions
         }   
         unreachable!()     
     }
