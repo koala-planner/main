@@ -1,7 +1,7 @@
 use std::collections::{BinaryHeap, HashSet, HashMap};
 use crate::{domain_description::FONDProblem, task_network::HTN, visualization::ToDOT};
 
-use super::{solution::SearchResult, solution::ComputeTree};
+use super::{SearchResult, ComputeTree};
 
 pub struct AOStarSearch {
 

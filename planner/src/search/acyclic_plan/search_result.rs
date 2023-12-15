@@ -1,4 +1,4 @@
-use super::fm_policy::StrongPolicy;
+use super::policy::StrongPolicy;
 
 #[derive(Debug)]
 pub enum SearchResult {

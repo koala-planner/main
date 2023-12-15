@@ -5,7 +5,7 @@ use std::borrow::BorrowMut;
 use std::collections::{HashMap, HashSet, LinkedList, BTreeSet};
 use std::vec;
 
-use super::fm_policy::StrongPolicy;
+use super::StrongPolicy;
 use super::{ConnectionLabel, connectors};
 use super::{connectors::NodeConnections, ComputeTreeNode, FONDProblem, SearchNode, SearchResult};
 use super::{HyperArc, NodeStatus, HTN};
@@ -13,8 +13,7 @@ use crate::relaxation::ToClassical;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-// use crate::heuristic_calculator::FF;
-
+// TODO: convert ids to a regular vector/array
 #[derive(Debug)]
 pub struct ComputeTree {
     pub ids: HashMap<u32, RefCell<ComputeTreeNode>>,
@@ -478,6 +477,7 @@ mod tests {
         assert_eq!([4, 6].contains(&tip_node), true);
     }
 
+    // TODO: Sometimes panic by attempting to add parent to root
     #[test]
     pub fn expansion_test() {
         let mut tree = generate_tree();

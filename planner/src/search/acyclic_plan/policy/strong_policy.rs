@@ -7,12 +7,8 @@ use super::SearchNode;
 
 use super::ComputeTree;
 use super::ConnectionLabel;
+use super::PolicyNode;
 
-#[derive(Debug)]
-pub struct PolicyInput{
-    pub state: HashSet<String>,
-    pub tn: Rc<HTN>
-}
 
 #[derive(Debug)]
 pub struct PolicyOutput{
@@ -22,7 +18,7 @@ pub struct PolicyOutput{
 
 #[derive(Debug)]
 pub struct StrongPolicy {
-    pub transitions: Vec<(PolicyInput, PolicyOutput)>
+    pub transitions: Vec<(PolicyNode, PolicyOutput)>
 }
 
 impl StrongPolicy {
@@ -37,7 +33,7 @@ impl StrongPolicy {
             let state: HashSet<String> = node.search_node.state.as_ref().iter().map(|x| {
                 facts.get_fact(*x).clone()
             }).collect();
-            let input = PolicyInput {
+            let input = PolicyNode {
                 tn: node.search_node.tn.clone(),
                 state: state
             };
