@@ -1,6 +1,6 @@
 use crate::domain_description::{ClassicalDomain, Facts};
 use crate::relaxation::OutcomeDeterminizer;
-use crate::search::fixed_method::search_node;
+use crate::search::acyclic_plan::search_node;
 use std::borrow::BorrowMut;
 use std::collections::{HashMap, HashSet, LinkedList, BTreeSet};
 use std::vec;
