@@ -50,3 +50,9 @@ def solve(domain, problem, timeout=30):
         os.remove(planner_path + "result.json")
     else:
         print(f"failed to serialize {problem}", file=sys.stderr)
+
+if __name__ == "__main__":
+    import sys
+    domain = sys.argv[1]
+    problem = sys.argv[2]
+    solve(domain, problem)
