@@ -18,6 +18,6 @@ fn main() {
         return;
     }
     let problem = read_json_domain(&args[1]);
-    let solution = search::AOStarSearch::run(&problem);
-    println!("{}", solution);
+    let (solution, stats) = search::AOStarSearch::run(&problem);
+    println!("{}", stats);
 }

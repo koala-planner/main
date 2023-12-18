@@ -6,6 +6,7 @@ mod policy;
 mod search_result;
 
 use super::{HTN, Task, Applicability, PrimitiveAction, CompoundTask};
+use super::SearchStats;
 use crate::domain_description::FONDProblem;
 pub use ao_star::AOStarSearch;
 pub use search_result::SearchResult;

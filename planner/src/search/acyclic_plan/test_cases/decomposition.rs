@@ -114,6 +114,6 @@ pub fn decomposition_test() {
         init_tn: init_tn
     };
     problem.collapse_tn();
-    let result = AOStarSearch::run(&problem);
+    let (result, _) = AOStarSearch::run(&problem);
     assert_eq!(result.is_success(), true);
 }

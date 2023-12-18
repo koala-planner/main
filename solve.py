@@ -8,7 +8,7 @@ def solve(domain, problem, timeout=30):
     parser_path = path + "/parser/pandaPIparser"
     grounder_path = path + "/grounder/pandaPIgrounder/"
     serilazer_path = path + "/serializer/"
-    planner_path = path + "/search/"
+    planner_path = path + "/planner/"
     # Parsing
     parsed = subprocess.run(
         [parser_path,
