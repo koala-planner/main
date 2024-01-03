@@ -343,7 +343,8 @@ task_def : '(' task_or_action NAME
 					for (size_t i=0; i < n_effects; i++){
 						// primitive task
 						parsed_task t;
-						string new_name = string("fond_act__") + $3 + std::to_string(i);
+						string new_name = string("fond_act__") + $3 + string("_") + std::to_string(i+1)
+															   + string("of") + std::to_string(n_effects);
 						t.name = new_name;
 						t.arguments = $4;
 						t.prec = $5;
