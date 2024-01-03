@@ -19,7 +19,7 @@ pub struct PolicyOutput{
 #[derive(Debug)]
 pub struct StrongPolicy {
     pub transitions: Vec<(PolicyNode, PolicyOutput)>,
-    pub makespan: u16
+    pub makespan: u16,
 }
 
 impl StrongPolicy {
