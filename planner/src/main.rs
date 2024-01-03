@@ -10,6 +10,7 @@ mod heuristic_calculator;
 mod visualization;
 
 use domain_description::read_json_domain;
+use crate::search::SearchResult;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -19,5 +20,15 @@ fn main() {
     }
     let problem = read_json_domain(&args[1]);
     let (solution, stats) = search::AOStarSearch::run(&problem);
-    println!("{}", stats);
+    print!("{}", stats);
+    match solution {
+        SearchResult::Success(x) => {
+            println!("makespan: {}", x.makespan);
+            println!("***************************");
+            println!("{}", x);
+        },
+        SearchResult::NoSolution => {
+            println!("Problem has no solution")
+        }
+    }
 }

@@ -18,7 +18,8 @@ pub struct PolicyOutput{
 
 #[derive(Debug)]
 pub struct StrongPolicy {
-    pub transitions: Vec<(PolicyNode, PolicyOutput)>
+    pub transitions: Vec<(PolicyNode, PolicyOutput)>,
+    pub makespan: u16
 }
 
 impl StrongPolicy {
@@ -26,6 +27,7 @@ impl StrongPolicy {
         // vec of (state, vec(exectuted_task_names), new_task)
         let mut policy = vec![];
         let mut working_set: LinkedList<u32> = LinkedList::from([computation_history.root]);
+        let mut makespan = u16::MIN;;
         // TOOD: for each branch the execution history changes
         while !working_set.is_empty() {
             let id = working_set.pop_front().unwrap();
@@ -41,6 +43,9 @@ impl StrongPolicy {
             match &node.connections {
                 Some(connection) => {
                     if let Some(marked) = connection.has_marked_connection() {
+                        if node.depth > makespan {
+                            makespan = node.depth
+                        }
                         // Check whether transition is decomposition or primitive action execution
                         match &marked.action_type {
                             ConnectionLabel::Decomposition(name, method) => {
@@ -74,7 +79,7 @@ impl StrongPolicy {
                 }
             } 
         }
-        StrongPolicy { transitions: policy }
+        StrongPolicy { transitions: policy, makespan: makespan }
     }
 }
 
