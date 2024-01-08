@@ -26,11 +26,17 @@ impl StrongPolicy {
     pub fn new(facts: &Facts, computation_history: &ComputeTree) -> StrongPolicy {
         // vec of (state, vec(exectuted_task_names), new_task)
         let mut policy = vec![];
+        let mut visited = HashSet::new();
         let mut working_set: LinkedList<u32> = LinkedList::from([computation_history.root]);
         let mut makespan = u16::MIN;;
         // TOOD: for each branch the execution history changes
         while !working_set.is_empty() {
             let id = working_set.pop_front().unwrap();
+            if visited.contains(&id) {
+                continue;
+            } else {
+                visited.insert(id);
+            }
             let node = computation_history.ids.get(&id).unwrap().borrow();
             let state: HashSet<String> = node.search_node.state.as_ref().iter().map(|x| {
                 facts.get_fact(*x).clone()

@@ -11,7 +11,7 @@ impl AOStarSearch {
     // the initial TN is assumed to be in collapsed format (i.e., with a single abstract task)
     pub fn run(problem: &FONDProblem) -> (SearchResult, SearchStats) {
         let mut explored_nodes: u32 = 0;
-        let mut max_depth = u16::MIN;
+        let mut max_depth = 0;
         let start_time = Instant::now();
         let mut compute_tree = ComputeTree::new(problem);
         while !compute_tree.is_terminated() {
