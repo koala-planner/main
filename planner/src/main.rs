@@ -25,8 +25,8 @@ fn main() {
         SearchResult::Success(x) => {
             println!("makespan: {}", x.makespan);
             println!("policy enteries: {}", x.transitions.len());
-            println!("***************************");
-            println!("{}", x);
+            //println!("***************************");
+            //println!("{}", x);
         },
         SearchResult::NoSolution => {
             println!("Problem has no solution")
