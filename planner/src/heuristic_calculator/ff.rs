@@ -2,7 +2,7 @@ use std::collections::{HashSet, HashMap};
 
 use crate::domain_description::ClassicalDomain;
 
-use super::GraphPlan;
+use super::graphplan::GraphPlan;
 
 #[derive(Debug)]
 pub struct FF {}

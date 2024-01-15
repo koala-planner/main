@@ -13,8 +13,6 @@ impl std::fmt::Display for SearchStats {
         writeln!(f, "# of search nodes: {}", self.search_nodes);
         writeln!(f, "# of explored nodes: {}", self.explored_nodes);
         let time = self.seach_time.as_secs_f64();
-        let mm = (time / 60.0).trunc();
-        let ss = time - (mm * 60.0);
-        writeln!(f, "search duration: {}:{}", mm, ss.trunc())
+        writeln!(f, "search duration: {}", time.trunc())
     }
 }
