@@ -114,6 +114,6 @@ pub fn decomposition_test() {
         init_tn: init_tn
     };
     problem.collapse_tn();
-    let (result, _) = AOStarSearch::run(&problem);
+    let (result, _) = AOStarSearch::run(&problem, crate::search::acyclic_plan::HeuristicType::HAdd);
     assert_eq!(result.is_success(), true);
 }

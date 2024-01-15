@@ -10,7 +10,7 @@ mod heuristic_calculator;
 mod visualization;
 
 use domain_description::read_json_domain;
-use crate::search::SearchResult;
+use crate::search::{SearchResult, HeuristicType};
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -19,7 +19,7 @@ fn main() {
         return;
     }
     let problem = read_json_domain(&args[1]);
-    let (solution, stats) = search::AOStarSearch::run(&problem);
+    let (solution, stats) = search::AOStarSearch::run(&problem, HeuristicType::HAdd);
     print!("{}", stats);
     match solution {
         SearchResult::Success(x) => {

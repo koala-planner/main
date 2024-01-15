@@ -1,7 +1,7 @@
 use std::{collections::{HashSet, BTreeSet, HashMap}, rc::Rc, cell::RefCell};
-use crate::{task_network::Applicability, relaxation::ToClassical};
+use crate::{task_network::Applicability, relaxation::ToClassical, heuristic_calculator::h_add};
 use crate::heuristic_calculator::FF;
-use super::{HTN, PrimitiveAction, Task, CompoundTask};
+use super::{HTN, PrimitiveAction, Task, CompoundTask, h_type, HeuristicType};
 #[derive(Debug, Clone)]
 pub struct SearchNode{
     pub state: Rc<HashSet<u32>>,
@@ -13,7 +13,7 @@ impl SearchNode {
         SearchNode { state, tn }
     }
     
-    pub fn compute_heuristic_value(&self, encoder: &ToClassical, bijection: &HashMap<u32, u32>) -> f32 {
+    pub fn compute_heuristic_value(&self, encoder: &ToClassical, bijection: &HashMap<u32, u32>, h_type: &HeuristicType) -> f32 {
         let occurances = self.tn.count_tasks_with_frequency();
         let task_ids = occurances.iter().map(|(task, _)| {
             *bijection.get(task).unwrap()
@@ -23,14 +23,18 @@ impl SearchNode {
             self.state.as_ref()
         );
         let goal_state = encoder.compute_goal_state(&task_ids);
-        let mut ff_val = FF::calculate_h(&encoder.domain, &relaxed_state, &goal_state);
+        let mut val = match h_type {
+            HeuristicType::HFF => FF::calculate_h(&encoder.domain, &relaxed_state, &goal_state),
+            HeuristicType::HAdd => h_add(&encoder.domain, &relaxed_state, &goal_state)
+        };
+        
         // Compensate for the repetition of tasks
         for (_, count) in occurances {
             if count > 1 {
-                ff_val += (count - 1) as f32
+                val += (count - 1) as f32
             }
         }
-        ff_val
+        val
     }
 
     pub fn is_goal(&self) -> bool {

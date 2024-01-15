@@ -1,6 +1,8 @@
+use h_type::HeuristicType;
+
 use crate::domain_description::{ClassicalDomain, Facts};
 use crate::relaxation::OutcomeDeterminizer;
-use crate::search::acyclic_plan::search_node;
+use crate::search::acyclic_plan::{search_node, h_type};
 use std::borrow::BorrowMut;
 use std::collections::{HashMap, HashSet, LinkedList, BTreeSet};
 use std::vec;
@@ -149,7 +151,7 @@ impl ComputeTree  {
         None
     }
 
-    pub fn expand(&mut self, id: u32) {
+    pub fn expand(&mut self, id: u32, h_type: &HeuristicType) {
         // if node's successor's has already been found, skip
         if let Some(_) = self.ids.get(&id).unwrap().borrow().connections {
             return;
@@ -182,7 +184,7 @@ impl ComputeTree  {
                         let mut h = 0.0;
                         match &self.relaxed_domain {
                             Some((encoder, bijection)) => {
-                                h = subproblem.compute_heuristic_value(encoder, bijection)
+                                h = subproblem.compute_heuristic_value(encoder, bijection, &h_type)
                             },
                             None => {}
                         }
@@ -481,7 +483,7 @@ mod tests {
     #[test]
     pub fn expansion_test() {
         let mut tree = generate_tree();
-        tree.expand(6);
+        tree.expand(6, &HeuristicType::HFF);
         assert_eq!(tree.ids.contains_key(&9), true);
         assert_eq!(tree.ids.len(), 9);
         let n = tree.ids.get(&6).unwrap().borrow();

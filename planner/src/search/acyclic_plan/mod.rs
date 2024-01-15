@@ -4,6 +4,7 @@ mod ao_star;
 mod compute_graph_structs;
 mod policy;
 mod search_result;
+mod h_type;
 
 use super::{HTN, Task, Applicability, PrimitiveAction, CompoundTask};
 use super::SearchStats;
@@ -15,3 +16,4 @@ pub use compute_graph_structs::*;
 pub use search_node::ConnectionLabel;
 pub use compute_graph_structs::ComputeTree;
 pub use policy::StrongPolicy;
+pub use h_type::HeuristicType;
