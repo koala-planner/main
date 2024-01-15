@@ -27,7 +27,7 @@ pub fn h_add(domain: &ClassicalDomain, state: &HashSet<u32>, goal: &HashSet<u32>
             }
         }
         if changed == false {
-            return 0.0;
+            return f32::INFINITY;
         }
     }
     let mut  total_cost = 0;
@@ -84,8 +84,19 @@ mod test {
         let domain = generate_domain();
         let h = h_add(&domain, &HashSet::from([0]), &HashSet::from([4, 0]));
         assert_eq!(h, 6.0);
-
         let h = h_add(&domain, &HashSet::from([0]), &HashSet::from([4, 2]));
         assert_eq!(h, 8.0);
+    }
+    #[test]
+    pub fn safety_test() {
+        let domain = generate_domain();
+        let h = h_add(&domain, &HashSet::from([0]), &HashSet::from([5]));
+        assert_eq!(h, f32::INFINITY);
+    }
+    #[test]
+    pub fn goal_awareness_test() {
+        let domain = generate_domain();
+        let h = h_add(&domain, &HashSet::from([0]), &HashSet::from([0]));
+        assert_eq!(h, 0.0);
     }
 }
