@@ -21,7 +21,9 @@ pub fn h_add(domain: &ClassicalDomain, state: &HashSet<u32>, goal: &HashSet<u32>
                 actions.insert(i, action_weight);
                 for effect in action.add_effects[0].iter() {
                     open_goals.remove(effect);
-                    facts.insert(*effect, action_weight);
+                    if !facts.contains_key(effect) {
+                        facts.insert(*effect, action_weight);
+                    }
                 }
                 changed = true
             }
