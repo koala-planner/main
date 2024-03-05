@@ -14,6 +14,6 @@ pub use search_result::SearchResult;
 pub use search_node::{SearchNode, NodeExpansion};
 pub use compute_graph_structs::*;
 pub use search_node::ConnectionLabel;
-pub use compute_graph_structs::ComputeTree;
+pub use compute_graph_structs::SearchGraph;
 pub use policy::StrongPolicy;
 pub use h_type::HeuristicType;

@@ -2,14 +2,14 @@ use std::{fmt::{write, format}, iter, collections::HashSet, u32};
 
 use rand::random;
 
-use crate::{search::{ComputeTree, ConnectionLabel}, task_network::HTN};
+use crate::{search::{SearchGraph, ConnectionLabel}, task_network::HTN};
 use super::NodeStatus;
 pub struct ToDOT {
 
 }
 
 impl ToDOT {
-    pub fn compute_tree(tree: &ComputeTree) -> String {
+    pub fn compute_tree(tree: &SearchGraph) -> String {
         let mut vertices = String::new();
         let mut edges = String::new();
         for (i, val) in tree.ids.iter() {
@@ -61,7 +61,7 @@ impl ToDOT {
         }
     }
 
-    fn and_node_string(tree: &ComputeTree, id: u32, children: Vec<(HashSet<u32>, bool, f32, String)>) -> String {
+    fn and_node_string(tree: &SearchGraph, id: u32, children: Vec<(HashSet<u32>, bool, f32, String)>) -> String {
         let mut string = String::new();
         for (child, is_marked, cost, label) in children.iter() {
             if child.len() == 1 {

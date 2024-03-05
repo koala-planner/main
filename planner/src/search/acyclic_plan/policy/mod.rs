@@ -2,7 +2,7 @@ mod strong_policy;
 mod node;
 
 use super::SearchNode;
-use super::ComputeTree;
+use super::SearchGraph;
 use super::ConnectionLabel;
 use super::HTN;
 

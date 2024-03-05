@@ -5,7 +5,7 @@ use crate::{domain_description::{DomainTasks, Facts}, task_network::HTN};
 
 use super::SearchNode;
 
-use super::ComputeTree;
+use super::SearchGraph;
 use super::ConnectionLabel;
 use super::PolicyNode;
 
@@ -23,7 +23,7 @@ pub struct StrongPolicy {
 }
 
 impl StrongPolicy {
-    pub fn new(facts: &Facts, computation_history: &ComputeTree) -> StrongPolicy {
+    pub fn new(facts: &Facts, computation_history: &SearchGraph) -> StrongPolicy {
         // vec of (state, vec(exectuted_task_names), new_task)
         let mut policy = vec![];
         let mut visited = HashSet::new();

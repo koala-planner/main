@@ -1,7 +1,7 @@
 use std::collections::{BinaryHeap, HashSet, HashMap};
 use crate::{domain_description::FONDProblem, task_network::HTN, visualization::ToDOT};
 
-use super::{SearchResult, ComputeTree, SearchStats, h_type, HeuristicType};
+use super::{SearchResult, SearchGraph, SearchStats, h_type, HeuristicType};
 use std::time::{Instant, Duration};
 
 pub struct AOStarSearch {
@@ -13,7 +13,7 @@ impl AOStarSearch {
         let mut explored_nodes: u32 = 0;
         let mut max_depth = 0;
         let start_time = Instant::now();
-        let mut compute_tree = ComputeTree::new(problem);
+        let mut compute_tree = SearchGraph::new(problem);
         while !compute_tree.is_terminated() {
             let n = compute_tree.find_a_tip_node();
             compute_tree.expand(n, &h_type);

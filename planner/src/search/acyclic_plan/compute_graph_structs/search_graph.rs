@@ -17,7 +17,7 @@ use std::rc::Rc;
 
 // TODO: convert ids to a regular vector/array
 #[derive(Debug)]
-pub struct ComputeTree {
+pub struct SearchGraph {
     pub ids: HashMap<u32, RefCell<ComputeTreeNode>>,
     pub root: u32,
     // Keeps teack of maximum u32 ID used in the tree
@@ -25,8 +25,8 @@ pub struct ComputeTree {
     relaxed_domain: Option<(ToClassical, HashMap<u32, u32>)>,
 }
 
-impl ComputeTree  {
-    pub fn new(problem: &FONDProblem) -> ComputeTree {
+impl SearchGraph  {
+    pub fn new(problem: &FONDProblem) -> SearchGraph {
         let initial_tn = problem.init_tn.clone();
         let search_node =
             SearchNode::new(Rc::new(problem.initial_state.clone()), Rc::new(initial_tn));
@@ -43,7 +43,7 @@ impl ComputeTree  {
             depth: 0,
         };
         // compute tree
-        ComputeTree {
+        SearchGraph {
             ids: HashMap::from([(1, RefCell::new(compute_node))]),
             root: 1,
             cursor: 2,
@@ -360,7 +360,7 @@ mod tests {
     use crate::{task_network::{Task, PrimitiveAction, CompoundTask}, visualization::ToDOT, domain_description::DomainTasks};
 
     use super::*;
-    fn generate_tree() -> ComputeTree {
+    fn generate_tree() -> SearchGraph {
         let dummy_action = Task::Primitive(PrimitiveAction::new(
             "dummy_action".to_string(), 
             1, 
@@ -460,7 +460,7 @@ mod tests {
             status: NodeStatus::OnGoing,
             depth: 2
         };
-        ComputeTree {
+        SearchGraph {
             ids: HashMap::from([
                 (1, RefCell::new(n1)), (2, RefCell::new(n2)), (3, RefCell::new(n3)), (4, RefCell::new(n4)),
                 (5, RefCell::new(n5)), (6, RefCell::new(n6)), (7, RefCell::new(n7)), (8, RefCell::new(n8))
@@ -536,13 +536,13 @@ mod tests {
                 )
             )
         };
-        let tree = ComputeTree {
+        let graph = SearchGraph {
             ids: HashMap::from([(1, RefCell::new(n1))]),
             root: 1,
             cursor: 2,
             relaxed_domain: None
         };
-        let visited = tree.visited(&n2);
+        let visited = graph.visited(&n2);
         assert_eq!(true, visited.is_some());
     }
 
