@@ -1,7 +1,7 @@
 use super::{SearchNode, NodeConnections, connectors::HyperArc};
 
 #[derive(Debug)]
-pub struct ComputeTreeNode {
+pub struct SearchGraphNode {
     pub parents: Option<Vec<u32>>,
     pub search_node: SearchNode,
     pub connections: Option<NodeConnections>,
@@ -27,7 +27,7 @@ impl NodeStatus {
     }
 }
 
-impl ComputeTreeNode {
+impl SearchGraphNode {
     pub fn mark(&mut self, i: u32) {
         self.clear_marks();
         self.connections.as_mut().unwrap().mark(i)

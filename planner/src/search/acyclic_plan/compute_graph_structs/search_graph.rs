@@ -9,7 +9,7 @@ use std::vec;
 
 use super::StrongPolicy;
 use super::{ConnectionLabel, connectors};
-use super::{connectors::NodeConnections, ComputeTreeNode, FONDProblem, SearchNode, SearchResult};
+use super::{connectors::NodeConnections, SearchGraphNode, FONDProblem, SearchNode, SearchResult};
 use super::{HyperArc, NodeStatus, HTN};
 use crate::relaxation::ToClassical;
 use std::cell::RefCell;
@@ -18,7 +18,7 @@ use std::rc::Rc;
 // TODO: convert ids to a regular vector/array
 #[derive(Debug)]
 pub struct SearchGraph {
-    pub ids: HashMap<u32, RefCell<ComputeTreeNode>>,
+    pub ids: HashMap<u32, RefCell<SearchGraphNode>>,
     pub root: u32,
     // Keeps teack of maximum u32 ID used in the tree
     pub cursor: u32,
@@ -34,7 +34,7 @@ impl SearchGraph  {
         let (outcome_det, bijection) = OutcomeDeterminizer::from_fond_problem(&problem);
         let relaxed = ToClassical::new(&outcome_det);
         // initial node
-        let compute_node = ComputeTreeNode {
+        let compute_node = SearchGraphNode {
             parents: None,
             search_node,
             connections: None,
@@ -42,7 +42,7 @@ impl SearchGraph  {
             status: NodeStatus::OnGoing,
             depth: 0,
         };
-        // compute tree
+        // search graph
         SearchGraph {
             ids: HashMap::from([(1, RefCell::new(compute_node))]),
             root: 1,
@@ -179,7 +179,7 @@ impl SearchGraph  {
                         } else if subproblem.is_goal() {
                             subproblem_label = NodeStatus::Solved;
                         }
-                        let new_subproblem = ComputeTreeNode {
+                        let new_subproblem = SearchGraphNode {
                             parents: Some(vec![id]),
                             search_node: subproblem,
                             connections: None,
@@ -360,7 +360,7 @@ mod tests {
                 BTreeSet::new(), vec![], dummy_domain.clone(), HashMap::new()
             ))
         };
-        let n1 = ComputeTreeNode {
+        let n1 = SearchGraphNode {
             parents: None,
             search_node: dummy_search_node.clone(),
             connections: Some(NodeConnections { children: vec![
@@ -375,7 +375,7 @@ mod tests {
             status: NodeStatus::OnGoing,
             depth: 0
         };
-        let n2 = ComputeTreeNode {
+        let n2 = SearchGraphNode {
             parents: Some(vec![1]),
             search_node: dummy_search_node.clone(),
             connections: None,
@@ -383,7 +383,7 @@ mod tests {
             status: NodeStatus::Failed,
             depth: 1
         };
-        let n3 = ComputeTreeNode {
+        let n3 = SearchGraphNode {
             parents: Some(vec![1]),
             search_node: dummy_search_node.clone(),
             connections: Some(NodeConnections { children: vec![
@@ -394,7 +394,7 @@ mod tests {
             status: NodeStatus::OnGoing,
             depth: 1
         };
-        let n4 = ComputeTreeNode {
+        let n4 = SearchGraphNode {
             parents: Some(vec![1]),
             search_node: dummy_search_node.clone(),
             connections: None,
@@ -402,7 +402,7 @@ mod tests {
             status: NodeStatus::Solved,
             depth: 1
         };
-        let n5 = ComputeTreeNode {
+        let n5 = SearchGraphNode {
             parents: Some(vec![1]),
             search_node: dummy_search_node.clone(),
             connections: Some(NodeConnections { children: vec![
@@ -413,7 +413,7 @@ mod tests {
             status: NodeStatus::OnGoing,
             depth: 1
         };
-        let n6 = ComputeTreeNode {
+        let n6 = SearchGraphNode {
             parents: Some(vec![3]),
             search_node: SearchNode::new(
                 Rc::new(HashSet::new()),
@@ -429,7 +429,7 @@ mod tests {
             status: NodeStatus::OnGoing,
             depth: 2
         };
-        let n7 = ComputeTreeNode {
+        let n7 = SearchGraphNode {
             parents: Some(vec![5]),
             search_node: dummy_search_node.clone(),
             connections: None,
@@ -437,7 +437,7 @@ mod tests {
             status: NodeStatus::OnGoing,
             depth: 2
         };
-        let n8 = ComputeTreeNode {
+        let n8 = SearchGraphNode {
             parents: Some(vec![5]),
             search_node: dummy_search_node.clone(),
             connections: None,
@@ -492,7 +492,7 @@ mod tests {
         let t1 = Task::Compound(CompoundTask::new("t1".to_string(), vec![]));
         let t2 = Task::Compound(CompoundTask::new("t2".to_string(), vec![]));
         let domain = Rc::new(DomainTasks::new(vec![t1, t2]));
-        let n1 = ComputeTreeNode {
+        let n1 = SearchGraphNode {
             parents: Some(vec![1]),
             search_node: SearchNode {
                 state: Rc::new(HashSet::from([1,2])),
