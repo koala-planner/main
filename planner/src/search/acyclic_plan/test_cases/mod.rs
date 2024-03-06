@@ -7,5 +7,5 @@ mod dag_test;
 
 use super::{HTN, Task, PrimitiveAction, CompoundTask, Applicability};
 use super::ao_star::AOStarSearch;
-use super::FONDProblem;
+use crate::domain_description::FONDProblem;
 use super::SearchResult;

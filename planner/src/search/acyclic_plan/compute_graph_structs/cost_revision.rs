@@ -1,5 +1,0 @@
-use super::*;
-
-impl SearchGraph {
-    
-}

@@ -1,5 +1,5 @@
 use std::collections::{BinaryHeap, HashSet, HashMap};
-use crate::{domain_description::FONDProblem, task_network::HTN, visualization::ToDOT};
+use crate::{domain_description::FONDProblem, task_network::HTN};
 
 use super::{SearchResult, SearchGraph, SearchStats, h_type, HeuristicType};
 use std::time::{Instant, Duration};

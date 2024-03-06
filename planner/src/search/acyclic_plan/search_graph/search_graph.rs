@@ -2,16 +2,13 @@ use h_type::HeuristicType;
 
 use crate::domain_description::{ClassicalDomain, Facts};
 use crate::relaxation::OutcomeDeterminizer;
-use crate::search::acyclic_plan::{search_node, h_type};
 use std::borrow::BorrowMut;
 use std::collections::{HashMap, HashSet, LinkedList, BTreeSet};
 use std::vec;
 
-use super::StrongPolicy;
-use super::{ConnectionLabel, connectors};
-use super::{connectors::NodeConnections, SearchGraphNode, FONDProblem, SearchNode, SearchResult};
-use super::{HyperArc, NodeStatus, HTN};
+use super::*;
 use crate::relaxation::ToClassical;
+use crate::domain_description::FONDProblem;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -342,7 +339,7 @@ impl SearchGraph  {
 mod tests {
     use std::collections::BTreeSet;
 
-    use crate::{task_network::{Task, PrimitiveAction, CompoundTask}, visualization::ToDOT, domain_description::DomainTasks};
+    use crate::{task_network::{Task, PrimitiveAction, CompoundTask}, domain_description::DomainTasks};
 
     use super::*;
     fn generate_tree() -> SearchGraph {
