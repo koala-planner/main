@@ -60,21 +60,6 @@ impl SearchGraph  {
         }
     }
 
-    pub fn get_max_cost_node(&self, nodes: &BTreeSet<u32>) -> u32 {
-        let (mut argmax, mut max_cost) = (u32::MAX, f32::INFINITY);
-        for id in nodes.iter() {
-            let node = self.ids.get(id).unwrap().borrow();
-            if node.cost < max_cost {
-                max_cost = node.cost;
-                argmax = *id;
-            }
-        }
-        if argmax == u32::MAX {
-            panic!("undefined behavior");
-        }
-        argmax
-    }
-
     pub fn search_result(&self, facts: &Facts) -> SearchResult {
         let root = self.ids.get(&self.root).unwrap().borrow();
         match root.status {
