@@ -1,8 +1,8 @@
 mod search_graph;
-mod compute_node;
+mod search_node;
 mod connectors;
 use super::*;
 
 pub use search_graph::SearchGraph;
-pub use compute_node::*;
+pub use search_node::*;
 pub use connectors::*;

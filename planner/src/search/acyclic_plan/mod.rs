@@ -1,5 +1,4 @@
-mod acyclic_revision;
-mod cyclic_revision;
+mod cost_revision;
 mod policy;
 mod search_result;
 mod forward_expansion;
@@ -11,5 +10,5 @@ use super::*;
 use policy::*;
 use progression::*;
 pub use search_result::SearchResult;
-use search_graph::SearchGraph;
+use search_graph::*;
 pub use ao_star::AOStarSearch;
