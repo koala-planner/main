@@ -87,7 +87,7 @@ impl SearchGraph {
     }
 
 
-    pub fn arc_status(&self, arc: &HyperArc) -> NodeStatus {
+    pub fn arc_status(&self, arc: &Connector) -> NodeStatus {
         let mut result = NodeStatus::Solved;
         for item in arc.children.iter() {
             let node = self.ids.get(&item).unwrap().borrow();

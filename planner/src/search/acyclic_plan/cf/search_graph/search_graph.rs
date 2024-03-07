@@ -50,8 +50,7 @@ impl SearchGraph  {
     pub fn is_terminated(&self) -> bool {
         let root = self.ids.get(&self.root).unwrap().borrow();
         match root.status {
-            NodeStatus::Solved => true,
-            NodeStatus::Failed => true,
+            NodeStatus::Solved | NodeStatus::Failed => true,
             NodeStatus::OnGoing => false,
         }
     }
@@ -121,11 +120,11 @@ mod tests {
             tn: Rc::new(HTN::new(BTreeSet::new(), vec![], dummy_domain.clone(), HashMap::new())),
             state: Rc::new(HashSet::new()),
             connections: Some(NodeConnections { children: vec![
-                HyperArc { children: HashSet::from([2]), cost: 1.0, is_marked: false,
+                Connector { children: HashSet::from([2]), cost: 1.0, is_marked: false,
                     action_type: ConnectionLabel::Execution("p1".to_string(), 1)},
-                HyperArc { children: HashSet::from([3, 4]), cost: 1.0, is_marked: true,
+                Connector { children: HashSet::from([3, 4]), cost: 1.0, is_marked: true,
                     action_type: ConnectionLabel::Execution("p2".to_string(), 2)},
-                HyperArc { children: HashSet::from([5]), cost: 0.0, is_marked: false,
+                Connector { children: HashSet::from([5]), cost: 0.0, is_marked: false,
                     action_type: ConnectionLabel::Decomposition("t1".to_string(), "m1".to_string())},
             ]}),
             cost: 2.0,
@@ -146,7 +145,7 @@ mod tests {
             tn: Rc::new(HTN::new(BTreeSet::new(), vec![], dummy_domain.clone(), HashMap::new())),
             state: Rc::new(HashSet::new()),
             connections: Some(NodeConnections { children: vec![
-                HyperArc { children: HashSet::from([6]), cost: 1.0, is_marked: true,
+                Connector { children: HashSet::from([6]), cost: 1.0, is_marked: true,
                     action_type: ConnectionLabel::Decomposition("t1".to_string(), "m3".to_string())}
             ]}),
             cost: 2.0,
@@ -167,7 +166,7 @@ mod tests {
             tn: Rc::new(HTN::new(BTreeSet::new(), vec![], dummy_domain.clone(), HashMap::new())),
             state: Rc::new(HashSet::new()),
             connections: Some(NodeConnections { children: vec![
-                HyperArc { children: HashSet::from([7, 8]), cost: 1.0, is_marked: false,
+                Connector { children: HashSet::from([7, 8]), cost: 1.0, is_marked: false,
                     action_type: ConnectionLabel::Execution("p3".to_string(), 1)},
             ]}),
             cost: 3.0,

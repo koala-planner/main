@@ -5,11 +5,11 @@ use super::ConnectionLabel;
 
 #[derive(Debug)]
 pub struct NodeConnections {
-    pub children: Vec<HyperArc>
+    pub children: Vec<Connector>
 }
 
 #[derive(Debug)]
-pub struct HyperArc {
+pub struct Connector {
     pub children: HashSet<u32>,
     pub cost: f32,
     pub is_marked: bool,
@@ -17,7 +17,7 @@ pub struct HyperArc {
 }
 
 impl NodeConnections {
-    pub fn new(children: Vec<HyperArc>) -> NodeConnections {
+    pub fn new(children: Vec<Connector>) -> NodeConnections {
         NodeConnections { children }
     }
 
@@ -31,7 +31,7 @@ impl NodeConnections {
         }
     }
 
-    pub fn has_marked_connection(&self) -> Option<&HyperArc> {
+    pub fn has_marked_connection(&self) -> Option<&Connector> {
         for child in self.children.iter() {
             if child.is_marked == true {
                 return Some(child);
@@ -53,20 +53,20 @@ mod test {
 
     #[test]
     pub fn marking_test() {
-        let arc1 = HyperArc {
+        let arc1 = Connector {
             children: HashSet::from([1,2,3]),
             cost: 0.0,
             is_marked: false,
             action_type: ConnectionLabel::Decomposition("t1".to_string(), "m1".to_string())
             
         };
-        let arc2 = HyperArc {
+        let arc2 = Connector {
             children: HashSet::from([5,4]),
             cost: 0.0,
             is_marked: true,
             action_type: ConnectionLabel::Decomposition("t1".to_string(), "m2".to_string())
         };
-        let arc3 = HyperArc {
+        let arc3 = Connector {
             children: HashSet::from([7,54]),
             cost: 0.0,
             is_marked: false,

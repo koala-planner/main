@@ -66,7 +66,7 @@ impl SearchGraph {
         }
         let mut connectors = vec![];
         for expansion in node_successors.into_iter() {
-            let mut hyperarc = HyperArc {
+            let mut hyperarc = Connector {
                 children: HashSet::new(),
                 cost: 1.0,
                 is_marked: false,

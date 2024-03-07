@@ -39,7 +39,7 @@ impl SearchGraphNode {
         self.clear_marks();
         self.connections.as_mut().unwrap().mark(i)
     }
-    pub fn get_marked_connection(&self) -> Option<&HyperArc> {
+    pub fn get_marked_connection(&self) -> Option<&Connector> {
         for item in self.connections.as_ref().unwrap().children.iter() {
             if item.is_marked {
                 return Some(item);
