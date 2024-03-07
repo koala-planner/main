@@ -1,9 +1,16 @@
+use std::{collections::{HashSet, HashMap}, rc::Rc};
+
 use super::*;
+use crate::heuristic_calculator::FF;
+use super::{HTN, PrimitiveAction, Task, CompoundTask, h_type, HeuristicType};
+
+use crate::{task_network::Applicability, relaxation::ToClassical, heuristic_calculator::h_add};
 
 #[derive(Debug)]
 pub struct SearchGraphNode {
     pub parents: Option<Vec<u32>>,
-    pub search_node: SearchNode,
+    pub tn: Rc<HTN>,
+    pub state: Rc<HashSet<u32>>,
     pub connections: Option<NodeConnections>,
     pub cost: f32,
     pub status: NodeStatus,
@@ -65,5 +72,33 @@ impl SearchGraphNode {
 
     pub fn is_terminal(&self) -> bool {
         self.status.is_terminal()
+    }
+
+    pub fn is_goal(&self) -> bool {
+        self.tn.is_empty()
+    }
+
+    pub fn h_val(tn: &HTN, state: &HashSet<u32>, encoder: &ToClassical, bijection: &HashMap<u32, u32>, h_type: &HeuristicType) -> f32 {
+        let occurances = tn.count_tasks_with_frequency();
+        let task_ids = occurances.iter().map(|(task, _)| {
+            *bijection.get(task).unwrap()
+        }).collect();
+        let relaxed_state = encoder.compute_relaxed_state(
+            &task_ids,
+            state
+        );
+        let goal_state = encoder.compute_goal_state(&task_ids);
+        let mut val = match h_type {
+            HeuristicType::HFF => FF::calculate_h(&encoder.domain, &relaxed_state, &goal_state),
+            HeuristicType::HAdd => h_add(&encoder.domain, &relaxed_state, &goal_state)
+        };
+        
+        // Compensate for the repetition of tasks
+        for (_, count) in occurances {
+            if count > 1 {
+                val += (count - 1) as f32
+            }
+        }
+        val
     }
 }

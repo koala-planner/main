@@ -25,15 +25,14 @@ pub struct SearchGraph {
 impl SearchGraph  {
     pub fn new(problem: &FONDProblem) -> SearchGraph {
         let initial_tn = problem.init_tn.clone();
-        let search_node =
-            SearchNode::new(Rc::new(problem.initial_state.clone()), Rc::new(initial_tn));
         // relaxed domain
         let (outcome_det, bijection) = OutcomeDeterminizer::from_fond_problem(&problem);
         let relaxed = ToClassical::new(&outcome_det);
         // initial node
         let compute_node = SearchGraphNode {
             parents: None,
-            search_node,
+            tn: Rc::new(initial_tn),
+            state: Rc::new(problem.initial_state.clone()),
             connections: None,
             cost: 0.0,
             status: NodeStatus::OnGoing,
@@ -69,7 +68,7 @@ impl SearchGraph  {
 
     pub fn mark_as_terminal(&mut self, id: u32) {
         let mut node = self.ids.get(&id).unwrap().borrow_mut();
-        if node.search_node.is_goal() {
+        if node.is_goal() {
             node.status = NodeStatus::Solved;
             node.cost = 0.0;
         } else {
@@ -78,11 +77,18 @@ impl SearchGraph  {
         }
     }
 
-    pub fn visited(&self, search_node: &SearchNode) -> Option<u32> {
+    pub fn visited(&self, tn: &HTN, state: &HashSet<u32>) -> Option<u32> {
         for (id, node) in self.ids.iter() {
             let node = node.borrow();
-            if node.search_node == *search_node {
-                return Some(*id);
+            if node.state.as_ref() == state {
+                if HTN::is_isomorphic(&node.tn, tn) {
+                    return Some(*id);
+                }
+                else {
+                    return None;
+                }
+            } else {
+                return None;
             }
         }
         None
@@ -110,15 +116,10 @@ mod tests {
             vec![HashSet::new(), HashSet::from([3])]
         ));
         let dummy_domain = Rc::new(DomainTasks::new(vec![dummy_action]));
-        let dummy_search_node = SearchNode {
-            state: Rc::new(HashSet::new()),
-            tn: Rc::new(HTN::new(
-                BTreeSet::new(), vec![], dummy_domain.clone(), HashMap::new()
-            ))
-        };
         let n1 = SearchGraphNode {
             parents: None,
-            search_node: dummy_search_node.clone(),
+            tn: Rc::new(HTN::new(BTreeSet::new(), vec![], dummy_domain.clone(), HashMap::new())),
+            state: Rc::new(HashSet::new()),
             connections: Some(NodeConnections { children: vec![
                 HyperArc { children: HashSet::from([2]), cost: 1.0, is_marked: false,
                     action_type: ConnectionLabel::Execution("p1".to_string(), 1)},
@@ -133,7 +134,8 @@ mod tests {
         };
         let n2 = SearchGraphNode {
             parents: Some(vec![1]),
-            search_node: dummy_search_node.clone(),
+            tn: Rc::new(HTN::new(BTreeSet::new(), vec![], dummy_domain.clone(), HashMap::new())),
+            state: Rc::new(HashSet::new()),
             connections: None,
             cost: f32::INFINITY,
             status: NodeStatus::Failed,
@@ -141,7 +143,8 @@ mod tests {
         };
         let n3 = SearchGraphNode {
             parents: Some(vec![1]),
-            search_node: dummy_search_node.clone(),
+            tn: Rc::new(HTN::new(BTreeSet::new(), vec![], dummy_domain.clone(), HashMap::new())),
+            state: Rc::new(HashSet::new()),
             connections: Some(NodeConnections { children: vec![
                 HyperArc { children: HashSet::from([6]), cost: 1.0, is_marked: true,
                     action_type: ConnectionLabel::Decomposition("t1".to_string(), "m3".to_string())}
@@ -152,7 +155,8 @@ mod tests {
         };
         let n4 = SearchGraphNode {
             parents: Some(vec![1]),
-            search_node: dummy_search_node.clone(),
+            tn: Rc::new(HTN::new(BTreeSet::new(), vec![], dummy_domain.clone(), HashMap::new())),
+            state: Rc::new(HashSet::new()),
             connections: None,
             cost: 0.0,
             status: NodeStatus::Solved,
@@ -160,7 +164,8 @@ mod tests {
         };
         let n5 = SearchGraphNode {
             parents: Some(vec![1]),
-            search_node: dummy_search_node.clone(),
+            tn: Rc::new(HTN::new(BTreeSet::new(), vec![], dummy_domain.clone(), HashMap::new())),
+            state: Rc::new(HashSet::new()),
             connections: Some(NodeConnections { children: vec![
                 HyperArc { children: HashSet::from([7, 8]), cost: 1.0, is_marked: false,
                     action_type: ConnectionLabel::Execution("p3".to_string(), 1)},
@@ -171,15 +176,13 @@ mod tests {
         };
         let n6 = SearchGraphNode {
             parents: Some(vec![3]),
-            search_node: SearchNode::new(
-                Rc::new(HashSet::new()),
-                Rc::new(HTN::new(
+            state: Rc::new(HashSet::new()),
+            tn: Rc::new(HTN::new(
                     BTreeSet::from([1]), 
                     vec![],
                     dummy_domain.clone(),
                     HashMap::from([(1, dummy_domain.get_id("dummy_action"))])
-                ))
-            ),
+                )),
             connections: None,
             cost: 1.0,  
             status: NodeStatus::OnGoing,
@@ -187,7 +190,8 @@ mod tests {
         };
         let n7 = SearchGraphNode {
             parents: Some(vec![5]),
-            search_node: dummy_search_node.clone(),
+            tn: Rc::new(HTN::new(BTreeSet::new(), vec![], dummy_domain.clone(), HashMap::new())),
+            state: Rc::new(HashSet::new()),
             connections: None,
             cost: 2.0,
             status: NodeStatus::OnGoing,
@@ -195,7 +199,8 @@ mod tests {
         };
         let n8 = SearchGraphNode {
             parents: Some(vec![5]),
-            search_node: dummy_search_node.clone(),
+            tn: Rc::new(HTN::new(BTreeSet::new(), vec![], dummy_domain.clone(), HashMap::new())),
+            state: Rc::new(HashSet::new()),
             connections: None,
             cost: 1.0,
             status: NodeStatus::OnGoing,
@@ -250,32 +255,19 @@ mod tests {
         let domain = Rc::new(DomainTasks::new(vec![t1, t2]));
         let n1 = SearchGraphNode {
             parents: Some(vec![1]),
-            search_node: SearchNode {
-                state: Rc::new(HashSet::from([1,2])),
-                tn: Rc::new(
+            state: Rc::new(HashSet::from([1,2])),
+            tn: Rc::new(
                     HTN::new(
                         BTreeSet::from([1,2]), 
                         vec![(1,2)], 
                         domain.clone(),
                 HashMap::from([(1,0), (2,1)])
                     )
-                )
-            },
+                ),
             connections: None,
             cost: 10.0,
             status: NodeStatus::OnGoing,
             depth: 0
-        };
-        let n2 = SearchNode {
-            state: Rc::new(HashSet::from([1,2])),
-            tn: Rc::new(
-                HTN::new(
-                    BTreeSet::from([4,5]), 
-                    vec![(4,5)], 
-                    domain.clone(),
-            HashMap::from([(4,0), (5,1)])
-                )
-            )
         };
         let graph = SearchGraph {
             ids: HashMap::from([(1, RefCell::new(n1))]),
@@ -283,7 +275,14 @@ mod tests {
             cursor: 2,
             relaxed_domain: None
         };
-        let visited = graph.visited(&n2);
+        let visited = graph.visited(&
+            HTN::new(
+                BTreeSet::from([4,5]), 
+                vec![(4,5)], 
+                domain.clone(),
+        HashMap::from([(4,0), (5,1)])
+            )
+        , &HashSet::from([1,2]));
         assert_eq!(true, visited.is_some());
     }
 

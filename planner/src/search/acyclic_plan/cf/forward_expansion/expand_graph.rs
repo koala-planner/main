@@ -55,7 +55,9 @@ impl SearchGraph {
             return;
         }
         // compute successors
-        let node_successors = self.ids.get(&id).unwrap().borrow().search_node.expand();
+        let node = self.ids.get(&id).unwrap().borrow();
+        let node_successors = progress(node.tn.clone(), node.state.clone());
+        drop(node);
         let depth = self.ids.get(&id).unwrap().borrow().depth.clone();
         // Case where node is terminal, terminate expansion
         if node_successors.len() == 0 {
@@ -70,9 +72,8 @@ impl SearchGraph {
                 is_marked: false,
                 action_type: expansion.connection_label
             };
-            let subproblems = expansion.items;
-            for subproblem in subproblems {
-                let visited_before = self.visited(&subproblem);
+            for state in expansion.states.iter() {
+                let visited_before = self.visited(expansion.tn.as_ref(), state.as_ref());
                 match visited_before {
                     Some(x) => {
                         self.ids.get(&x).unwrap().borrow_mut().add_parent(x);
@@ -82,25 +83,26 @@ impl SearchGraph {
                         let mut h = 0.0;
                         match &self.relaxed_domain {
                             Some((encoder, bijection)) => {
-                                h = subproblem.compute_heuristic_value(encoder, bijection, &h_type)
+                                h = SearchGraphNode::h_val(expansion.tn.as_ref(), state.as_ref(), encoder, bijection, &h_type)
                             },
                             None => {}
                         }
-                        let mut subproblem_label = NodeStatus::OnGoing;
+                        let mut node_label = NodeStatus::OnGoing;
                         if h == f32::INFINITY {
-                            subproblem_label = NodeStatus::Failed;
-                        } else if subproblem.is_goal() {
-                            subproblem_label = NodeStatus::Solved;
+                            node_label = NodeStatus::Failed;
+                        } else if expansion.tn.is_goal() {
+                            node_label = NodeStatus::Solved;
                         }
-                        let new_subproblem = SearchGraphNode {
+                        let new_search_node = SearchGraphNode {
                             parents: Some(vec![id]),
-                            search_node: subproblem,
+                            tn: expansion.tn.clone(),
+                            state: state.clone(),
                             connections: None,
                             cost: h,
-                            status: subproblem_label,
+                            status: node_label,
                             depth: depth + 1
                         };
-                        self.ids.insert(self.cursor, RefCell::new(new_subproblem));
+                        self.ids.insert(self.cursor, RefCell::new(new_search_node));
                         hyperarc.children.insert(self.cursor);
                         self.cursor += 1;
                     }
