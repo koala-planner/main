@@ -1,6 +1,8 @@
 #![allow(unused)]
 use std::env;
 
+extern crate bit_vec;
+
 mod domain_description;
 mod graph_lib;
 mod task_network;
