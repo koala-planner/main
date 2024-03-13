@@ -9,3 +9,4 @@ use search_stats::SearchStats;
 pub use h_type::HeuristicType;
 pub use acyclic_plan::*;
 use progression::*;
+use search_graph::*;

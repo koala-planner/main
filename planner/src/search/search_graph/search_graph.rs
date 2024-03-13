@@ -143,7 +143,8 @@ impl SearchGraph  {
         return candidate
     }
 
-    pub fn expand(&mut self, id: u32, h_type: &HeuristicType) {
+    // TODO: better interface, decouple heuristic from graph
+    pub fn expand(&mut self, id: u32, h_type: &HeuristicType, skip_heuristic: bool) {
         // if node's successor's has already been found, skip
         if let Some(_) = self.ids.get(&id).unwrap().borrow().connections {
             return;
@@ -174,18 +175,20 @@ impl SearchGraph  {
                         hyperarc.children.insert(x);
                     },
                     None => {
-                        let mut h = 0.0;
-                        match &self.relaxed_domain {
-                            Some((encoder, bijection)) => {
-                                h = SearchGraphNode::h_val(expansion.tn.as_ref(), state.as_ref(), encoder, bijection, &h_type)
-                            },
-                            None => {}
-                        }
                         let mut node_label = NodeStatus::OnGoing;
-                        if h == f32::INFINITY {
-                            node_label = NodeStatus::Failed;
-                        } else if expansion.tn.is_goal() {
+                        let mut h = 0.0;
+                        if expansion.tn.is_goal() {
                             node_label = NodeStatus::Solved;
+                        } else if !skip_heuristic {
+                            match &self.relaxed_domain {
+                                Some((encoder, bijection)) => {
+                                    h = SearchGraphNode::h_val(expansion.tn.as_ref(), state.as_ref(), encoder, bijection, &h_type)
+                                },
+                                None => {}
+                            }
+                            if h == f32::INFINITY {
+                                node_label = NodeStatus::Failed;
+                            }
                         }
                         let new_search_node = SearchGraphNode {
                             parents: Some(vec![id]),
@@ -337,7 +340,7 @@ mod tests {
     #[test]
     pub fn expansion_test() {
         let mut tree = generate_tree();
-        tree.expand(6, &HeuristicType::HFF);
+        tree.expand(6, &HeuristicType::HFF, false);
         assert_eq!(tree.ids.contains_key(&9), true);
         assert_eq!(tree.ids.len(), 9);
         let n = tree.ids.get(&6).unwrap().borrow();

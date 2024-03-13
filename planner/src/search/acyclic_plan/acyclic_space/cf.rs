@@ -16,7 +16,7 @@ impl AOStarSearch {
         let mut search_graph = SearchGraph::new(problem);
         while !search_graph.is_terminated() {
             let n = search_graph.find_a_tip_node();
-            search_graph.expand(n, &h_type);
+            search_graph.expand(n, &h_type, false);
             search_graph.backward_cost_revision(n);
             explored_nodes+=1;
             let depth = search_graph.ids.get(&n).unwrap().borrow().depth;
