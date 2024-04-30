@@ -45,9 +45,7 @@ impl CFCRevStar {
             // Initialize revisables
             self.build_revisable(n);
             self.revisables.iter().map(|x| {
-                let mut node = self.search_graph.ids.get(x).unwrap().borrow_mut();
-                self.prev_cost.insert(*x, node.cost.clone());
-                node.cost = f32::INFINITY;
+                self.found.remove(x)
             });
 
             // initialize open nodes
@@ -79,7 +77,7 @@ impl CFCRevStar {
                     None => {}
                 }
                 drop(node_m);
-                self.cost_prop(m, &mut VecDeque::new());
+                self.cost_prop(m);
             }
         }
         todo!()
@@ -114,7 +112,7 @@ impl CFCRevStar {
         self.revisables = revisable_set;
     }
 
-    fn cost_prop(&mut self, m: u32, cost_prop_queue: VecDeque<u32>){
+    fn cost_prop(&mut self, m: u32){
         self.found.insert(m);
         let mut m_node = &self.search_graph.ids.get(&m).unwrap().borrow_mut();
         // TODO: foreach p \in P(m)
@@ -193,7 +191,7 @@ impl CFCRevStar {
                                 p_node.status = node_status;
                             }
                             self.open.remove(&p);
-                            cost_prop_queue.push_back(*p);
+                            self.cost_prop(*p);
                         } else {
                             let conenction_index = self.child_parent_connector_index(&connectors, m);
                             let connector = &connectors.children[conenction_index];
@@ -218,12 +216,12 @@ impl CFCRevStar {
                                                 p_node.status = NodeStatus::Solved;
                                             }
                                         }
-                                        cost_prop_queue.push_back(*p);
+                                        self.cost_prop(*p);
                                     }
                                 }
                             } else {
                                 // TODO: else
-                                cost_prop_queue.push_back(*p);
+                                self.cost_prop(*p);
                             }
                         }
                     }

@@ -4,7 +4,7 @@ use super::*;
 use crate::heuristic_calculator::FF;
 use super::{HTN, PrimitiveAction, Task, CompoundTask, h_type, HeuristicType};
 
-use crate::{task_network::Applicability, relaxation::ToClassical, heuristic_calculator::h_add};
+use crate::{task_network::Applicability, relaxation::ToClassical, heuristic_calculator::{h_add, h_max}};
 
 #[derive(Debug)]
 pub struct SearchGraphNode {
@@ -90,7 +90,8 @@ impl SearchGraphNode {
         let goal_state = encoder.compute_goal_state(&task_ids);
         let mut val = match h_type {
             HeuristicType::HFF => FF::calculate_h(&encoder.domain, &relaxed_state, &goal_state),
-            HeuristicType::HAdd => h_add(&encoder.domain, &relaxed_state, &goal_state)
+            HeuristicType::HAdd => h_add(&encoder.domain, &relaxed_state, &goal_state),
+            HeuristicType::HMax => h_max(&encoder.domain, &relaxed_state, &goal_state),
         };
         
         // Compensate for the repetition of tasks
