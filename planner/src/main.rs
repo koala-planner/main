@@ -8,7 +8,7 @@ mod graph_lib;
 mod task_network;
 mod search;
 mod relaxation;
-mod heuristic_calculator;
+mod heuristics;
 
 use domain_description::read_json_domain;
 use crate::search::{SearchResult, HeuristicType};

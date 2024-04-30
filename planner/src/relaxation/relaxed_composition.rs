@@ -8,14 +8,14 @@ use crate::{domain_description::FONDProblem, task_network::HTN};
 use regex::Regex;
 
 #[derive(Debug)]
-pub struct ToClassical{
+pub struct RelaxedComposition{
     tdg: TDG,
     htn_tasks: Rc<DomainTasks>,
     pub domain: ClassicalDomain,
 }
 
-impl ToClassical  {
-    pub fn new(domain: &FONDProblem) -> ToClassical {
+impl RelaxedComposition  {
+    pub fn new(domain: &FONDProblem) -> RelaxedComposition {
         let mut new_facts = domain.facts.clone();
         // top down encoding
         let tasks = domain.tasks.get_all_tasks();
@@ -28,10 +28,10 @@ impl ToClassical  {
             .collect();
         new_facts = new_facts.extend(bottom_up_facts);
 
-        let new_actions = ToClassical::encode(&domain, &new_facts);
+        let new_actions = RelaxedComposition::encode(&domain, &new_facts);
         let classic_domain = ClassicalDomain { facts: new_facts, actions: new_actions };
         let tdg = TDG::new(&domain.init_tn);
-        ToClassical { domain: classic_domain, htn_tasks: domain.tasks.clone(), tdg: tdg }
+        RelaxedComposition { domain: classic_domain, htn_tasks: domain.tasks.clone(), tdg: tdg }
     }
 
     fn encode(domain: &FONDProblem, facts: &Facts) -> Vec<PrimitiveAction> {
@@ -246,7 +246,7 @@ mod tests {
     #[test]
     pub fn encoding_test() {
         let problem = generate_problem();
-        let to_classical = ToClassical::new(&problem);
+        let to_classical = RelaxedComposition::new(&problem);
         let encoded = to_classical.domain;
         assert_eq!(encoded.facts.count(), 17);
         assert_eq!(encoded.actions.len(), 9);
@@ -268,7 +268,7 @@ mod tests {
     #[test]
     pub fn state_computation_test() {
         let problem = generate_problem();
-        let to_classical = ToClassical::new(&problem);
+        let to_classical = RelaxedComposition::new(&problem);
         let t1 = &problem.tasks.get_all_tasks().iter()
             .filter(|x| x.borrow().get_name() == "t1").cloned().collect::<Vec<RefCell<Task>>>()[0];
         let state = HashSet::from([to_classical.domain.facts.get_id("1")]);
@@ -296,7 +296,7 @@ mod tests {
     #[test]
     pub fn goal_state_test() {
         let problem = generate_problem();
-        let to_classical = ToClassical::new(&problem);
+        let to_classical = RelaxedComposition::new(&problem);
         let all_tasks = problem.tasks.get_all_tasks();
         let t1 = &all_tasks.iter()
             .filter(|x| x.borrow().get_name() == "t1").cloned().collect::<Vec<RefCell<Task>>>()[0];

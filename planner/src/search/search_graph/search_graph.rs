@@ -7,7 +7,7 @@ use std::collections::{HashMap, HashSet, LinkedList, BTreeSet};
 use std::vec;
 
 use super::*;
-use crate::relaxation::ToClassical;
+use crate::relaxation::RelaxedComposition;
 use crate::domain_description::FONDProblem;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -19,7 +19,7 @@ pub struct SearchGraph {
     pub root: u32,
     // Keeps teack of maximum u32 ID used in the tree
     pub cursor: u32,
-    pub relaxed_domain: Option<(ToClassical, HashMap<u32, u32>)>,
+    pub relaxed_domain: Option<(RelaxedComposition, HashMap<u32, u32>)>,
 }
 
 impl SearchGraph  {
@@ -27,7 +27,7 @@ impl SearchGraph  {
         let initial_tn = problem.init_tn.clone();
         // relaxed domain
         let (outcome_det, bijection) = OutcomeDeterminizer::from_fond_problem(&problem);
-        let relaxed = ToClassical::new(&outcome_det);
+        let relaxed = RelaxedComposition::new(&outcome_det);
         // initial node
         let compute_node = SearchGraphNode {
             parents: None,

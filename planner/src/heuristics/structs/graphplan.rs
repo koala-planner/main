@@ -172,7 +172,7 @@ impl <'a> std::fmt::Display for GraphPlan<'a> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{heuristic_calculator::PrimitiveAction, domain_description::Facts};
+    use crate::{heuristics::PrimitiveAction, domain_description::Facts};
     
     pub fn generate_domain() -> ClassicalDomain {
         let p1 = PrimitiveAction::new(

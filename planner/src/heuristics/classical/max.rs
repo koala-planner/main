@@ -16,7 +16,7 @@ pub fn h_max(domain: &ClassicalDomain, state: &HashSet<u32>, goal: &HashSet<u32>
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::heuristic_calculator::PrimitiveAction;
+    use crate::heuristics::PrimitiveAction;
     use crate::domain_description::Facts;
 
     pub fn generate_domain() -> ClassicalDomain {
