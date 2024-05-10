@@ -1,5 +1,5 @@
 use std::collections::{BinaryHeap, HashSet, HashMap};
-use crate::{domain_description::FONDProblem, task_network::HTN, visualization::ToDOT};
+use crate::{domain_description::FONDProblem, task_network::HTN};
 
 use super::{SearchResult, SearchGraph, SearchStats, h_type, HeuristicType};
 use std::time::{Instant, Duration};
@@ -13,21 +13,21 @@ impl AOStarSearch {
         let mut explored_nodes: u32 = 0;
         let mut max_depth = 0;
         let start_time = Instant::now();
-        let mut compute_tree = SearchGraph::new(problem);
-        while !compute_tree.is_terminated() {
-            let n = compute_tree.find_a_tip_node();
-            compute_tree.expand(n, &h_type);
-            compute_tree.backward_cost_revision(n);
+        let mut search_graph = SearchGraph::new(problem);
+        while !search_graph.is_terminated() {
+            let n = search_graph.find_a_tip_node();
+            search_graph.expand(n, &h_type, false);
+            search_graph.backward_cost_revision(n);
             explored_nodes+=1;
-            let depth = compute_tree.ids.get(&n).unwrap().borrow().depth;
+            let depth = search_graph.ids.get(&n).unwrap().borrow().depth;
             if depth > max_depth {
                 max_depth = depth;
             }
         }
-        let result = compute_tree.search_result(&problem.facts);
+        let result = search_graph.search_result(&problem.facts);
         let stats = SearchStats {
             max_depth: max_depth,
-            search_nodes: compute_tree.ids.len() as u32,
+            search_nodes: search_graph.ids.len() as u32,
             explored_nodes: explored_nodes,
             seach_time: start_time.elapsed()
         };

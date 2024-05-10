@@ -3,11 +3,7 @@ use std::rc::Rc;
 
 use crate::{domain_description::{DomainTasks, Facts}, task_network::HTN};
 
-use super::SearchNode;
-
-use super::SearchGraph;
-use super::ConnectionLabel;
-use super::PolicyNode;
+use super::*;
 
 
 #[derive(Debug)]
@@ -38,11 +34,11 @@ impl StrongPolicy {
                 visited.insert(id);
             }
             let node = computation_history.ids.get(&id).unwrap().borrow();
-            let state: HashSet<String> = node.search_node.state.as_ref().iter().map(|x| {
+            let state: HashSet<String> = node.state.as_ref().iter().map(|x| {
                 facts.get_fact(*x).clone()
             }).collect();
             let input = PolicyNode {
-                tn: node.search_node.tn.clone(),
+                tn: node.tn.clone(),
                 state: state
             };
             // Is node terminal?

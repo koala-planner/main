@@ -1,13 +1,14 @@
 #![allow(unused)]
 use std::env;
 
+extern crate bit_vec;
+
 mod domain_description;
 mod graph_lib;
 mod task_network;
 mod search;
 mod relaxation;
-mod heuristic_calculator;
-mod visualization;
+mod heuristics;
 
 use domain_description::read_json_domain;
 use crate::search::{SearchResult, HeuristicType};

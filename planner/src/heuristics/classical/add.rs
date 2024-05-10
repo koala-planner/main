@@ -1,6 +1,6 @@
-use super::graphplan::GraphPlan;
+use super::*;
 use std::{collections::{HashSet, HashMap}, iter::repeat};
-use crate::{domain_description::ClassicalDomain, task_network::Applicability};
+use crate::task_network::Applicability;
 
 pub fn h_add(domain: &ClassicalDomain, state: &HashSet<u32>, goal: &HashSet<u32>) -> f32 {
     let mut facts: HashMap<u32, u32> = state.iter().cloned().zip(repeat(0 as u32)).collect();
@@ -32,7 +32,7 @@ pub fn h_add(domain: &ClassicalDomain, state: &HashSet<u32>, goal: &HashSet<u32>
             return f32::INFINITY;
         }
     }
-    let mut  total_cost = 0;
+    let mut total_cost = 0;
     for f in goal.iter() {
         total_cost += facts.get(f).unwrap();
     }
@@ -42,7 +42,7 @@ pub fn h_add(domain: &ClassicalDomain, state: &HashSet<u32>, goal: &HashSet<u32>
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::heuristic_calculator::PrimitiveAction;
+    use crate::heuristics::PrimitiveAction;
     use crate::domain_description::Facts;
 
     pub fn generate_domain() -> ClassicalDomain {

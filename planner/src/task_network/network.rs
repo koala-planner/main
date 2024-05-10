@@ -33,6 +33,14 @@ impl HTN {
         }
     }
 
+    pub fn is_goal(&self) -> bool {
+        if self.count_tasks() == 0 {
+            true
+        } else {
+            false
+        }
+    }
+
     pub fn get_orderings(&self) -> Vec<(u32,u32)>{
         self.network.get_edges()
     }

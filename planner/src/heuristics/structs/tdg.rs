@@ -1,9 +1,8 @@
 use core::fmt;
 use std::{rc::Rc, collections::{HashMap, HashSet, LinkedList, BTreeSet}, vec};
 
-use crate::domain_description::DomainTasks;
 use std::cell::RefCell;
-use super::{Task, CompoundTask, PrimitiveAction, HTN};
+use super::*;
 
 #[derive(Debug)]
 pub struct TDG{

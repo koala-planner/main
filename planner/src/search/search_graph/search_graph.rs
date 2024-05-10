@@ -2,47 +2,43 @@ use h_type::HeuristicType;
 
 use crate::domain_description::{ClassicalDomain, Facts};
 use crate::relaxation::OutcomeDeterminizer;
-use crate::search::acyclic_plan::{search_node, h_type};
 use std::borrow::BorrowMut;
 use std::collections::{HashMap, HashSet, LinkedList, BTreeSet};
 use std::vec;
 
-use super::StrongPolicy;
-use super::{ConnectionLabel, connectors};
-use super::{connectors::NodeConnections, ComputeTreeNode, FONDProblem, SearchNode, SearchResult};
-use super::{HyperArc, NodeStatus, HTN};
-use crate::relaxation::ToClassical;
+use super::*;
+use crate::relaxation::RelaxedComposition;
+use crate::domain_description::FONDProblem;
 use std::cell::RefCell;
 use std::rc::Rc;
 
 // TODO: convert ids to a regular vector/array
 #[derive(Debug)]
 pub struct SearchGraph {
-    pub ids: HashMap<u32, RefCell<ComputeTreeNode>>,
+    pub ids: HashMap<u32, RefCell<SearchGraphNode>>,
     pub root: u32,
     // Keeps teack of maximum u32 ID used in the tree
     pub cursor: u32,
-    relaxed_domain: Option<(ToClassical, HashMap<u32, u32>)>,
+    pub relaxed_domain: Option<(RelaxedComposition, HashMap<u32, u32>)>,
 }
 
 impl SearchGraph  {
     pub fn new(problem: &FONDProblem) -> SearchGraph {
         let initial_tn = problem.init_tn.clone();
-        let search_node =
-            SearchNode::new(Rc::new(problem.initial_state.clone()), Rc::new(initial_tn));
         // relaxed domain
         let (outcome_det, bijection) = OutcomeDeterminizer::from_fond_problem(&problem);
-        let relaxed = ToClassical::new(&outcome_det);
+        let relaxed = RelaxedComposition::new(&outcome_det);
         // initial node
-        let compute_node = ComputeTreeNode {
+        let compute_node = SearchGraphNode {
             parents: None,
-            search_node,
+            tn: Rc::new(initial_tn),
+            state: Rc::new(problem.initial_state.clone()),
             connections: None,
             cost: 0.0,
             status: NodeStatus::OnGoing,
             depth: 0,
         };
-        // compute tree
+        // search graph
         SearchGraph {
             ids: HashMap::from([(1, RefCell::new(compute_node))]),
             root: 1,
@@ -54,25 +50,9 @@ impl SearchGraph  {
     pub fn is_terminated(&self) -> bool {
         let root = self.ids.get(&self.root).unwrap().borrow();
         match root.status {
-            NodeStatus::Solved => true,
-            NodeStatus::Failed => true,
+            NodeStatus::Solved | NodeStatus::Failed => true,
             NodeStatus::OnGoing => false,
         }
-    }
-
-    pub fn get_max_cost_node(&self, nodes: &BTreeSet<u32>) -> u32 {
-        let (mut argmax, mut max_cost) = (u32::MAX, f32::INFINITY);
-        for id in nodes.iter() {
-            let node = self.ids.get(id).unwrap().borrow();
-            if node.cost < max_cost {
-                max_cost = node.cost;
-                argmax = *id;
-            }
-        }
-        if argmax == u32::MAX {
-            panic!("undefined behavior");
-        }
-        argmax
     }
 
     pub fn search_result(&self, facts: &Facts) -> SearchResult {
@@ -82,6 +62,39 @@ impl SearchGraph  {
             NodeStatus::Failed => SearchResult::NoSolution,
             NodeStatus::OnGoing => panic!("computation not terminated"),
         }
+    }
+
+
+    fn mark_as_terminal(&mut self, id: u32) {
+        let mut node = self.ids.get(&id).unwrap().borrow_mut();
+        if node.is_goal() {
+            node.status = NodeStatus::Solved;
+            node.cost = 0.0;
+        } else {
+            node.status = NodeStatus::Failed;
+            node.cost = f32::INFINITY;
+        }
+    }
+
+    fn visited(&self, tn: &HTN, state: &HashSet<u32>) -> Option<u32> {
+        for (id, node) in self.ids.iter() {
+            let node = node.borrow();
+            if node.state.as_ref() == state {
+                if HTN::is_isomorphic(&node.tn, tn) {
+                    return Some(*id);
+                }
+                else {
+                    return None;
+                }
+            } else {
+                return None;
+            }
+        }
+        None
+    }
+
+    fn is_terminal(&self, id: &u32) -> bool {
+        self.ids.get(id).unwrap().borrow().is_terminal()
     }
 
     pub fn find_a_tip_node(&self) -> u32 {
@@ -130,34 +143,16 @@ impl SearchGraph  {
         return candidate
     }
 
-    fn mark_as_terminal(&mut self, id: u32) {
-        let mut node = self.ids.get(&id).unwrap().borrow_mut();
-        if node.search_node.is_goal() {
-            node.status = NodeStatus::Solved;
-            node.cost = 0.0;
-        } else {
-            node.status = NodeStatus::Failed;
-            node.cost = f32::INFINITY;
-        }
-    }
-
-    pub fn visited(&self, search_node: &SearchNode) -> Option<u32> {
-        for (id, node) in self.ids.iter() {
-            let node = node.borrow();
-            if node.search_node == *search_node {
-                return Some(*id);
-            }
-        }
-        None
-    }
-
-    pub fn expand(&mut self, id: u32, h_type: &HeuristicType) {
+    // TODO: better interface, decouple heuristic from graph
+    pub fn expand(&mut self, id: u32, h_type: &HeuristicType, skip_heuristic: bool) {
         // if node's successor's has already been found, skip
         if let Some(_) = self.ids.get(&id).unwrap().borrow().connections {
             return;
         }
         // compute successors
-        let node_successors = self.ids.get(&id).unwrap().borrow().search_node.expand();
+        let node = self.ids.get(&id).unwrap().borrow();
+        let node_successors = progress(node.tn.clone(), node.state.clone());
+        drop(node);
         let depth = self.ids.get(&id).unwrap().borrow().depth.clone();
         // Case where node is terminal, terminate expansion
         if node_successors.len() == 0 {
@@ -166,43 +161,45 @@ impl SearchGraph  {
         }
         let mut connectors = vec![];
         for expansion in node_successors.into_iter() {
-            let mut hyperarc = HyperArc {
+            let mut hyperarc = Connector {
                 children: HashSet::new(),
                 cost: 1.0,
                 is_marked: false,
                 action_type: expansion.connection_label
             };
-            let subproblems = expansion.items;
-            for subproblem in subproblems {
-                let visited_before = self.visited(&subproblem);
+            for state in expansion.states.iter() {
+                let visited_before = self.visited(expansion.tn.as_ref(), state.as_ref());
                 match visited_before {
                     Some(x) => {
                         self.ids.get(&x).unwrap().borrow_mut().add_parent(x);
                         hyperarc.children.insert(x);
                     },
                     None => {
+                        let mut node_label = NodeStatus::OnGoing;
                         let mut h = 0.0;
-                        match &self.relaxed_domain {
-                            Some((encoder, bijection)) => {
-                                h = subproblem.compute_heuristic_value(encoder, bijection, &h_type)
-                            },
-                            None => {}
+                        if expansion.tn.is_goal() {
+                            node_label = NodeStatus::Solved;
+                        } else if !skip_heuristic {
+                            match &self.relaxed_domain {
+                                Some((encoder, bijection)) => {
+                                    h = SearchGraphNode::h_val(expansion.tn.as_ref(), state.as_ref(), encoder, bijection, &h_type)
+                                },
+                                None => {}
+                            }
+                            if h == f32::INFINITY {
+                                node_label = NodeStatus::Failed;
+                            }
                         }
-                        let mut subproblem_label = NodeStatus::OnGoing;
-                        if h == f32::INFINITY {
-                            subproblem_label = NodeStatus::Failed;
-                        } else if subproblem.is_goal() {
-                            subproblem_label = NodeStatus::Solved;
-                        }
-                        let new_subproblem = ComputeTreeNode {
+                        let new_search_node = SearchGraphNode {
                             parents: Some(vec![id]),
-                            search_node: subproblem,
+                            tn: expansion.tn.clone(),
+                            state: state.clone(),
                             connections: None,
                             cost: h,
-                            status: subproblem_label,
+                            status: node_label,
                             depth: depth + 1
                         };
-                        self.ids.insert(self.cursor, RefCell::new(new_subproblem));
+                        self.ids.insert(self.cursor, RefCell::new(new_search_node));
                         hyperarc.children.insert(self.cursor);
                         self.cursor += 1;
                     }
@@ -212,152 +209,13 @@ impl SearchGraph  {
         }
         self.ids.get(&id).unwrap().borrow_mut().connections = Some(NodeConnections { children: connectors });
     }
-
-    fn is_terminal(&self, id: &u32) -> bool {
-        self.ids.get(id).unwrap().borrow().is_terminal()
-    }
-
-    // return parent ID if further revision is needed
-    fn revise_node_cost(&mut self, id: &u32) -> Option<Vec<u32>> {
-        let mut node = self.ids.get(id).unwrap().borrow_mut();
-        // Check whether Node is terminal or not
-        match node.status {
-            NodeStatus::Failed => {
-                node.cost = f32::INFINITY;
-                return node.parents.clone();
-            }
-            NodeStatus::Solved => {
-                node.cost = 0.0;
-                return node.parents.clone();
-            }
-            // If node is not terminal, check whether children terminated or not
-            NodeStatus::OnGoing => {
-                match self.children_status(node.connections.as_ref().unwrap()) {
-                    NodeStatus::Failed => {
-                        node.status = NodeStatus::Failed;
-                        node.cost = f32::INFINITY;
-                        node.clear_marks();
-                        return node.parents.clone();
-                    }
-                    NodeStatus::Solved => {
-                        node.status = NodeStatus::Solved;
-                        let (min_cost, arg_min) =
-                            self.compute_min_cost(node.connections.as_ref().unwrap());
-                        node.mark(arg_min);
-                        node.cost = min_cost;
-                        return node.parents.clone();
-                    }
-                    // children are not terminal
-                    NodeStatus::OnGoing => {
-                        let (min_cost, arg_min) =
-                            self.compute_min_cost(node.connections.as_ref().unwrap());
-                        node.mark(arg_min);
-                        // If cost has changed
-                        if node.cost != min_cost {
-                            node.cost = min_cost;
-                            return node.parents.clone();
-                        } else {
-                            return None;
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    fn children_status(&self, connections: &NodeConnections) -> NodeStatus {
-        // Is there at least one path to continue?
-        let mut all_failed = true;
-        for arc in connections.children.iter() {
-            match self.arc_status(arc) {
-                NodeStatus::Solved => return NodeStatus::Solved,
-                NodeStatus::Failed => {},
-                NodeStatus::OnGoing => all_failed = false
-            }
-        }
-        if all_failed {
-            NodeStatus::Failed
-        } else {
-            NodeStatus::OnGoing
-        }
-    }
-
-    fn compute_min_cost(&self, connections: &NodeConnections) -> (f32, u32) {
-        let (mut min_cost, mut arg_min) = (f32::INFINITY, u32::max_value());
-        for (i, arc) in connections.children.iter().enumerate() {
-            let mut branch_cost = arc.cost;
-            let mut is_solved = true;
-            for child in arc.children.iter() {
-                let child = self.ids.get(child).unwrap().borrow();
-                branch_cost += child.cost;
-                match child.status {
-                    NodeStatus::Solved => {},
-                    _ => is_solved = false
-                }
-            }
-            if is_solved {
-                return (branch_cost, i as u32);
-            }
-            if branch_cost < min_cost {
-                min_cost = branch_cost;
-                arg_min = i as u32;
-            }
-        }
-        if min_cost.is_infinite() {
-            panic!("empty node connection")
-        }
-        (min_cost, arg_min)
-    }
-
-    // Backward induction procedure
-    // Corresponds to lines 8-13 in Nilson's book
-    pub fn backward_cost_revision(&mut self, id: u32) {
-        let mut working_set = BTreeSet::from([id]);
-        while !working_set.is_empty() {
-            let mut depths: Vec<(u32, u16)> = working_set.iter().map(|x| {
-                (*x, self.ids.get(x).unwrap().borrow().depth)
-            }).collect();
-            depths.sort_by(|(_, depth1), (_, depth2)| depth2.cmp(depth1));
-            let (node_id, _) = depths[0];
-            working_set.remove(&node_id);
-            match self.revise_node_cost(&node_id) {
-                Some(x) => {
-                    working_set.extend(x);
-                }
-                None => {}
-            }
-        }
-    }
-
-    fn compute_node_status(&self, id: u32) -> NodeStatus {
-        let node = self.ids.get(&id).unwrap().borrow();
-        match &node.connections {
-            Some(connection) => {
-                return self.children_status(connection) 
-            }
-            None => return node.status.clone(),
-        }
-    }
-
-    fn arc_status(&self, arc: &HyperArc) -> NodeStatus {
-        let mut result = NodeStatus::Solved;
-        for item in arc.children.iter() {
-            let node = self.ids.get(&item).unwrap().borrow();
-            match node.status {
-                NodeStatus::Failed => return NodeStatus::Failed,
-                NodeStatus::OnGoing => result = NodeStatus::OnGoing,
-                NodeStatus::Solved => {}
-            }
-        }
-        result
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeSet;
 
-    use crate::{task_network::{Task, PrimitiveAction, CompoundTask}, visualization::ToDOT, domain_description::DomainTasks};
+    use crate::{task_network::{Task, PrimitiveAction, CompoundTask}, domain_description::DomainTasks};
 
     use super::*;
     fn generate_tree() -> SearchGraph {
@@ -369,92 +227,91 @@ mod tests {
             vec![HashSet::new(), HashSet::from([3])]
         ));
         let dummy_domain = Rc::new(DomainTasks::new(vec![dummy_action]));
-        let dummy_search_node = SearchNode {
-            state: Rc::new(HashSet::new()),
-            tn: Rc::new(HTN::new(
-                BTreeSet::new(), vec![], dummy_domain.clone(), HashMap::new()
-            ))
-        };
-        let n1 = ComputeTreeNode {
+        let n1 = SearchGraphNode {
             parents: None,
-            search_node: dummy_search_node.clone(),
+            tn: Rc::new(HTN::new(BTreeSet::new(), vec![], dummy_domain.clone(), HashMap::new())),
+            state: Rc::new(HashSet::new()),
             connections: Some(NodeConnections { children: vec![
-                HyperArc { children: HashSet::from([2]), cost: 1.0, is_marked: false,
+                Connector { children: HashSet::from([2]), cost: 1.0, is_marked: false,
                     action_type: ConnectionLabel::Execution("p1".to_string(), 1)},
-                HyperArc { children: HashSet::from([3, 4]), cost: 1.0, is_marked: true,
+                Connector { children: HashSet::from([3, 4]), cost: 1.0, is_marked: true,
                     action_type: ConnectionLabel::Execution("p2".to_string(), 2)},
-                HyperArc { children: HashSet::from([5]), cost: 0.0, is_marked: false,
+                Connector { children: HashSet::from([5]), cost: 0.0, is_marked: false,
                     action_type: ConnectionLabel::Decomposition("t1".to_string(), "m1".to_string())},
             ]}),
             cost: 2.0,
             status: NodeStatus::OnGoing,
             depth: 0
         };
-        let n2 = ComputeTreeNode {
+        let n2 = SearchGraphNode {
             parents: Some(vec![1]),
-            search_node: dummy_search_node.clone(),
+            tn: Rc::new(HTN::new(BTreeSet::new(), vec![], dummy_domain.clone(), HashMap::new())),
+            state: Rc::new(HashSet::new()),
             connections: None,
             cost: f32::INFINITY,
             status: NodeStatus::Failed,
             depth: 1
         };
-        let n3 = ComputeTreeNode {
+        let n3 = SearchGraphNode {
             parents: Some(vec![1]),
-            search_node: dummy_search_node.clone(),
+            tn: Rc::new(HTN::new(BTreeSet::new(), vec![], dummy_domain.clone(), HashMap::new())),
+            state: Rc::new(HashSet::new()),
             connections: Some(NodeConnections { children: vec![
-                HyperArc { children: HashSet::from([6]), cost: 1.0, is_marked: true,
+                Connector { children: HashSet::from([6]), cost: 1.0, is_marked: true,
                     action_type: ConnectionLabel::Decomposition("t1".to_string(), "m3".to_string())}
             ]}),
             cost: 2.0,
             status: NodeStatus::OnGoing,
             depth: 1
         };
-        let n4 = ComputeTreeNode {
+        let n4 = SearchGraphNode {
             parents: Some(vec![1]),
-            search_node: dummy_search_node.clone(),
+            tn: Rc::new(HTN::new(BTreeSet::new(), vec![], dummy_domain.clone(), HashMap::new())),
+            state: Rc::new(HashSet::new()),
             connections: None,
             cost: 0.0,
             status: NodeStatus::Solved,
             depth: 1
         };
-        let n5 = ComputeTreeNode {
+        let n5 = SearchGraphNode {
             parents: Some(vec![1]),
-            search_node: dummy_search_node.clone(),
+            tn: Rc::new(HTN::new(BTreeSet::new(), vec![], dummy_domain.clone(), HashMap::new())),
+            state: Rc::new(HashSet::new()),
             connections: Some(NodeConnections { children: vec![
-                HyperArc { children: HashSet::from([7, 8]), cost: 1.0, is_marked: false,
+                Connector { children: HashSet::from([7, 8]), cost: 1.0, is_marked: false,
                     action_type: ConnectionLabel::Execution("p3".to_string(), 1)},
             ]}),
             cost: 3.0,
             status: NodeStatus::OnGoing,
             depth: 1
         };
-        let n6 = ComputeTreeNode {
+        let n6 = SearchGraphNode {
             parents: Some(vec![3]),
-            search_node: SearchNode::new(
-                Rc::new(HashSet::new()),
-                Rc::new(HTN::new(
+            state: Rc::new(HashSet::new()),
+            tn: Rc::new(HTN::new(
                     BTreeSet::from([1]), 
                     vec![],
                     dummy_domain.clone(),
                     HashMap::from([(1, dummy_domain.get_id("dummy_action"))])
-                ))
-            ),
+                )),
             connections: None,
             cost: 1.0,  
             status: NodeStatus::OnGoing,
             depth: 2
         };
-        let n7 = ComputeTreeNode {
+        let n7 = SearchGraphNode {
             parents: Some(vec![5]),
-            search_node: dummy_search_node.clone(),
+            tn: Rc::new(HTN::new(BTreeSet::new(), vec![], dummy_domain.clone(), HashMap::new())),
+            state: Rc::new(HashSet::new()),
             connections: None,
             cost: 2.0,
             status: NodeStatus::OnGoing,
             depth: 2
         };
-        let n8 = ComputeTreeNode {
+        let n8 = SearchGraphNode {
             parents: Some(vec![5]),
-            search_node: dummy_search_node.clone(),
+            tn: Rc::new(HTN::new(BTreeSet::new(), vec![], dummy_domain.clone(), HashMap::new())),
+            state: Rc::new(HashSet::new()),
             connections: None,
             cost: 1.0,
             status: NodeStatus::OnGoing,
@@ -483,7 +340,7 @@ mod tests {
     #[test]
     pub fn expansion_test() {
         let mut tree = generate_tree();
-        tree.expand(6, &HeuristicType::HFF);
+        tree.expand(6, &HeuristicType::HFF, false);
         assert_eq!(tree.ids.contains_key(&9), true);
         assert_eq!(tree.ids.len(), 9);
         let n = tree.ids.get(&6).unwrap().borrow();
@@ -507,34 +364,21 @@ mod tests {
         let t1 = Task::Compound(CompoundTask::new("t1".to_string(), vec![]));
         let t2 = Task::Compound(CompoundTask::new("t2".to_string(), vec![]));
         let domain = Rc::new(DomainTasks::new(vec![t1, t2]));
-        let n1 = ComputeTreeNode {
+        let n1 = SearchGraphNode {
             parents: Some(vec![1]),
-            search_node: SearchNode {
-                state: Rc::new(HashSet::from([1,2])),
-                tn: Rc::new(
+            state: Rc::new(HashSet::from([1,2])),
+            tn: Rc::new(
                     HTN::new(
                         BTreeSet::from([1,2]), 
                         vec![(1,2)], 
                         domain.clone(),
                 HashMap::from([(1,0), (2,1)])
                     )
-                )
-            },
+                ),
             connections: None,
             cost: 10.0,
             status: NodeStatus::OnGoing,
             depth: 0
-        };
-        let n2 = SearchNode {
-            state: Rc::new(HashSet::from([1,2])),
-            tn: Rc::new(
-                HTN::new(
-                    BTreeSet::from([4,5]), 
-                    vec![(4,5)], 
-                    domain.clone(),
-            HashMap::from([(4,0), (5,1)])
-                )
-            )
         };
         let graph = SearchGraph {
             ids: HashMap::from([(1, RefCell::new(n1))]),
@@ -542,7 +386,14 @@ mod tests {
             cursor: 2,
             relaxed_domain: None
         };
-        let visited = graph.visited(&n2);
+        let visited = graph.visited(&
+            HTN::new(
+                BTreeSet::from([4,5]), 
+                vec![(4,5)], 
+                domain.clone(),
+        HashMap::from([(4,0), (5,1)])
+            )
+        , &HashSet::from([1,2]));
         assert_eq!(true, visited.is_some());
     }
 
