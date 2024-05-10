@@ -14,10 +14,10 @@ To solve a planning problem ```/path/to/file/problem.hddl``` in domain ```/path/
 ```python solve.py /path/to/file/doamin.hddl /path/to/file/problem.hddl```
 
 # References
-[^1]: [Flexible FOND HTN Planning: A Complexity Analysis] (https://bercher.net/publications/2022/Chen2022FlexibleFONDHTNs.pdf)
+[^1]: [Flexible FOND HTN Planning: A Complexity Analysis](https://bercher.net/publications/2022/Chen2022FlexibleFONDHTNs.pdf)
 
-[^2]: [Laying the Foundations for Solving FOND HTN problems: Grounding, Search, Heuristics (and Benchmark Problems)] (#)
+[^2]: [Laying the Foundations for Solving FOND HTN problems: Grounding, Search, Heuristics (and Benchmark Problems)](#)
 
-[^3]: [On Succinct Groundings of HTN Planning Problems] (https://ojs.aaai.org/index.php/AAAI/article/view/6529)
+[^3]: [On Succinct Groundings of HTN Planning Problems](https://ojs.aaai.org/index.php/AAAI/article/view/6529)
 
-[^4]: [HDDL: An Extension to PDDL for Expressing Hierarchical Planning Problems] (https://staff.fnwi.uva.nl/g.behnke/papers/Hoeller2020HDDL.pdf)
+[^4]: [HDDL: An Extension to PDDL for Expressing Hierarchical Planning Problems](https://staff.fnwi.uva.nl/g.behnke/papers/Hoeller2020HDDL.pdf)
